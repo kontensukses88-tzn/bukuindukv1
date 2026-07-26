@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body {
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  }
+}
+
+.font-sans, .font-serif, .font-mono {
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif !important;
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Aplikasi Buku Induk Siswa SD",
+  "description": "Aplikasi Buku Induk Siswa Sekolah Dasar lengkap dengan data sekolah, data siswa, catatan nilai per kelas \u0026 semester, serta cetak dokumen buku induk.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
