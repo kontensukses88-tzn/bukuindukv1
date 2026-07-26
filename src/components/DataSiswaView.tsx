@@ -400,13 +400,15 @@ export const DataSiswaView: React.FC = () => {
                           </button>
 
                           <button
-                            onClick={() => {
-                              if (confirm(`Hapus data siswa ${s.namaLengkap}?`)) {
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Apakah Anda yakin ingin menghapus data siswa "${s.namaLengkap}" (NIS: ${s.nis})?`)) {
                                 deleteStudent(s.id);
                               }
                             }}
                             className="bg-red-100 hover:bg-red-200 text-red-700 p-1.5 rounded-lg transition cursor-pointer"
-                            title="Hapus Siswa"
+                            title="Hapus Data Siswa Ini"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

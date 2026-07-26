@@ -1,4 +1,4 @@
-import { CheckCircle2, Heart, Home, Image as ImageIcon, Link2, Save, Search, Upload, User, Users, X } from 'lucide-react';
+import { CheckCircle2, Heart, Home, Image as ImageIcon, Link2, Save, Search, Trash2, Upload, User, Users, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { Header } from './Header';
 import { useApp } from '../context/AppContext';
@@ -6,7 +6,7 @@ import { StudentDetail } from '../types';
 import { convertFileToBase64, formatGoogleDriveImageUrl, isGoogleDriveUrl } from '../utils/imageUtils';
 
 export const DataLengkapSiswaView: React.FC = () => {
-  const { students, selectedStudentId, setSelectedStudentId, updateStudent, getStudentById, rombelList, availableAcademicYears } = useApp();
+  const { students, selectedStudentId, setSelectedStudentId, updateStudent, deleteStudent, getStudentById, rombelList, availableAcademicYears } = useApp();
   
   const currentStudent = getStudentById(selectedStudentId || '') || students[0];
   const [formData, setFormData] = useState<StudentDetail>(currentStudent);
@@ -15,6 +15,12 @@ export const DataLengkapSiswaView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [imgFallbackIndex, setImgFallbackIndex] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (currentStudent) {
+      setFormData(currentStudent);
+    }
+  }, [selectedStudentId, currentStudent?.id]);
 
   const filteredStudents = students.filter(s =>
     s.namaLengkap.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -753,10 +759,23 @@ export const DataLengkapSiswaView: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-end pt-4 border-t">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`Apakah Anda yakin ingin menghapus data siswa "${formData.namaLengkap}" (NIS: ${formData.nis})?`)) {
+                  deleteStudent(formData.id);
+                }
+              }}
+              className="w-full sm:w-auto bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold px-4 py-2.5 rounded-xl transition flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hapus Siswa Ini</span>
+            </button>
+
             <button
               type="submit"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg flex items-center space-x-2 transition cursor-pointer"
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg flex items-center justify-center space-x-2 transition cursor-pointer"
             >
               <Save className="w-5 h-5" />
               <span>Simpan Perubahan Biodata</span>

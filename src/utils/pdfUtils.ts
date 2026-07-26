@@ -139,6 +139,38 @@ export function cleanCapaianDescription(rawDesc: string): string {
 }
 
 /**
+ * Normalizes raw class strings from e-Rapor PDF (e.g. "5 A", "5B", "1 A", "Kelas 5 A", "V A")
+ * into canonical "Tingkat 5", "Tingkat 1", etc.
+ */
+export function normalizeKelasToTingkat(rawKelas: string): string {
+  if (!rawKelas) return 'Tingkat 1';
+  const str = rawKelas.trim();
+
+  // 1. If already formatted as "Tingkat X"
+  const tingkatMatch = str.match(/tingkat\s*([1-6])/i);
+  if (tingkatMatch) {
+    return `Tingkat ${tingkatMatch[1]}`;
+  }
+
+  // 2. Extract digit 1-6 directly (e.g. "5 A", "5 B", "5A", "1 A", "2B", "Kelas 5", "Rombel 5 A")
+  const digitMatch = str.match(/([1-6])/);
+  if (digitMatch) {
+    return `Tingkat ${digitMatch[1]}`;
+  }
+
+  // 3. Handle Roman numerals
+  const upper = str.toUpperCase();
+  if (/\bVI\b/.test(upper)) return 'Tingkat 6';
+  if (/\bIV\b/.test(upper)) return 'Tingkat 4';
+  if (/\bV\b/.test(upper)) return 'Tingkat 5';
+  if (/\bIII\b/.test(upper)) return 'Tingkat 3';
+  if (/\bII\b/.test(upper)) return 'Tingkat 2';
+  if (/\bI\b/.test(upper)) return 'Tingkat 1';
+
+  return 'Tingkat 1';
+}
+
+/**
  * Extracts raw page text array from a PDF File
  */
 export async function extractTextFromPdf(file: File): Promise<{ pageNum: number; text: string }[]> {
@@ -213,9 +245,14 @@ export function parsePdfReportText(
 
     // Kelas extraction
     let kelas = '';
-    const kelasMatch = text.match(/Kelas\s*:\s*(\d+)\s*([A-Za-z]*)/i);
+    const kelasMatch = text.match(/Kelas\s*:\s*([^\n\|]+?)(?=\s+Fase|\s+Semester|\s+NIS|\s+Sekolah|\n|\||$)/i);
     if (kelasMatch) {
-      kelas = kelasMatch[2] ? `${kelasMatch[1]}${kelasMatch[2]}` : kelasMatch[1];
+      kelas = normalizeKelasToTingkat(kelasMatch[1]);
+    } else {
+      const footerClassMatch = text.match(/\b([1-6]\s*[A-Za-z]?)\b/);
+      if (footerClassMatch) {
+        kelas = normalizeKelasToTingkat(footerClassMatch[1]);
+      }
     }
 
     return { pageNum: page.pageNum, text, nis, nisn, nama, kelas };
@@ -256,7 +293,7 @@ export function parsePdfReportText(
           nisn: p.nisn,
           nis: p.nis,
           nama: p.nama || 'TANPA NAMA',
-          kelas: p.kelas || '1A',
+          kelas: normalizeKelasToTingkat(p.kelas),
           pageTexts: [p.text]
         });
       }
@@ -298,12 +335,13 @@ export function parsePdfReportText(
 
     // Kelas
     let kelas = group.kelas;
-    if (!kelas || kelas === '1A') {
-      const kelasMatch = combinedText.match(/Kelas\s*:\s*(\d+)\s*([A-Za-z]*)/i);
+    if (!kelas || kelas === 'Tingkat 1') {
+      const kelasMatch = combinedText.match(/Kelas\s*:\s*([^\n\|]+?)(?=\s+Fase|\s+Semester|\s+NIS|\s+Sekolah|\n|\||$)/i);
       if (kelasMatch) {
-        kelas = kelasMatch[2] ? `${kelasMatch[1]}${kelasMatch[2]}` : kelasMatch[1];
+        kelas = normalizeKelasToTingkat(kelasMatch[1]);
       }
     }
+    kelas = normalizeKelasToTingkat(kelas);
 
     // Semester
     const semMatch = combinedText.match(/Semester\s*:\s*(1|2)/i);

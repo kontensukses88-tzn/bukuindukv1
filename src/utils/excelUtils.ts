@@ -271,7 +271,7 @@ export const downloadExcelTemplate = () => {
   ];
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Siswa');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data_Siswa');
   XLSX.utils.book_append_sheet(workbook, instructionsSheet, 'Petunjuk Pengisian');
 
   XLSX.writeFile(workbook, 'Template_Import_Siswa_SD_Lengkap.xlsx');
@@ -308,16 +308,34 @@ export const parseExcelFile = (file: File): Promise<Omit<StudentDetail, 'id'>[]>
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
-        const firstSheetName = workbook.SheetNames[0];
-        if (!firstSheetName) {
+        
+        const sheetNames = workbook.SheetNames || [];
+        if (sheetNames.length === 0) {
           throw new Error('Lembar kerja (sheet) tidak ditemukan dalam berkas Excel.');
         }
 
-        const worksheet = workbook.Sheets[firstSheetName];
+        // Intelligently find Data_Siswa sheet (case-insensitive, ignoring instructions tab)
+        let targetSheetName = sheetNames.find(name => {
+          const n = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (n.includes('datasiswa') || n.includes('siswa')) && !n.includes('petunjuk') && !n.includes('instruction');
+        });
+
+        if (!targetSheetName) {
+          targetSheetName = sheetNames.find(name => {
+            const n = name.toLowerCase();
+            return !n.includes('petunjuk') && !n.includes('instruction');
+          }) || sheetNames[0];
+        }
+
+        const worksheet = workbook.Sheets[targetSheetName];
+        if (!worksheet) {
+          throw new Error(`Tabel lembar kerja Data_Siswa tidak ditemukan dalam file Excel.`);
+        }
+
         const rawRows: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
 
         if (!rawRows || rawRows.length === 0) {
-          throw new Error('File Excel kosong atau format tidak sesuai.');
+          throw new Error('Tabel Data_Siswa dalam file Excel kosong atau tidak memiliki baris data.');
         }
 
         const parsedStudents: Omit<StudentDetail, 'id'>[] = rawRows.map((row) => {

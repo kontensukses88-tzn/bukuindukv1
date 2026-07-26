@@ -394,11 +394,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteStudent = (id: string) => {
-    setStudents(prev => prev.filter(s => s.id !== id));
-    if (selectedStudentId === id) {
-      const remaining = students.filter(s => s.id !== id);
-      setSelectedStudentId(remaining.length > 0 ? remaining[0].id : null);
-    }
+    if (!id) return;
+    const targetId = String(id).trim();
+
+    setStudents(prev => {
+      const remaining = prev.filter(s => String(s.id).trim() !== targetId);
+      if (selectedStudentId === targetId || (selectedStudentId && String(selectedStudentId).trim() === targetId)) {
+        setSelectedStudentId(remaining.length > 0 ? remaining[0].id : null);
+      }
+      return remaining;
+    });
+
+    setSemesterRecords(prev => prev.filter(r => String(r.studentId).trim() !== targetId));
   };
 
   const getStudentById = (id: string) => {
