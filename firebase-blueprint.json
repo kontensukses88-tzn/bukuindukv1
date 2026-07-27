@@ -1,0 +1,26 @@
+{
+  "entities": {
+    "students": {
+      "title": "Students",
+      "description": "Data koleksi siswa sekolah",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nis": { "type": "string" },
+        "nisn": { "type": "string" },
+        "namaLengkap": { "type": "string" },
+        "jenisKelamin": { "type": "string" },
+        "statusSiswa": { "type": "string" }
+      },
+      "required": ["id", "nis", "namaLengkap"]
+    },
+    "appState": {
+      "title": "App State",
+      "description": "Pengaturan sekolah, rombel, dan tahun ajaran",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      }
+    }
+  }
+}

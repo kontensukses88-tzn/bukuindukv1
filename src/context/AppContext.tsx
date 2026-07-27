@@ -18,6 +18,7 @@ import {
 } from '../types';
 import {
   getSavedAppsScriptConfig,
+  loadDataFromAppsScript,
   saveAppsScriptConfig,
   syncAllDataToAppsScript
 } from '../lib/googleAppsScript';
@@ -27,6 +28,12 @@ import {
   syncAllDataToGoogleSheets
 } from '../lib/googleSheets';
 import { getCachedAccessToken } from '../lib/googleAuth';
+import {
+  deleteStudentFromFirestore,
+  loadFromFirebaseFirestore,
+  saveToFirebaseFirestore,
+  subscribeToFirebaseChanges
+} from '../lib/firebaseSync';
 
 interface AppContextType {
   schoolData: SchoolData;
@@ -50,6 +57,11 @@ interface AppContextType {
   
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
+
+  // Firebase Cloud Database Status
+  firebaseConnected: boolean;
+  firebaseSyncing: boolean;
+  firebaseLastSynced: Date | null;
 
   // Google Apps Script & Sheets Sync Status & Config
   webAppUrl: string;
@@ -109,6 +121,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : initialAcademicYear;
   });
 
+  const formatDateStr = (val: any) => {
+    if (!val) return '';
+    const strVal = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) return strVal;
+    if (strVal.includes('GMT') || strVal.includes('00:00:00')) {
+      const d = new Date(strVal);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return strVal;
+  };
+
+  const formatRtRwStr = (val: any) => {
+    if (!val) return '';
+    const strVal = String(val).trim();
+    if (strVal.includes('GMT') || strVal.includes('00:00:00')) {
+      const d = new Date(strVal);
+      if (!isNaN(d.getTime())) {
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${month}/${day}`;
+      }
+    }
+    return strVal;
+  };
+
   const sanitizeStudentsList = (rawStudents: StudentDetail[]): StudentDetail[] => {
     if (!Array.isArray(rawStudents)) return [];
     const seenIds = new Set<string>();
@@ -121,7 +163,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id = `${id}-dup${idx + 1}`;
       }
       seenIds.add(id);
-      return { ...s, id };
+      return {
+        ...s,
+        id,
+        tanggalLahir: formatDateStr(s.tanggalLahir),
+        tanggalDiterima: formatDateStr(s.tanggalDiterima),
+        rtRw: formatRtRwStr(s.rtRw)
+      };
     });
   };
 
@@ -184,9 +232,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedStudentId(null);
     }
   }, [academicYear.tahunAjaran, students]);
+  const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzdTtGi3u8FmyJhl9HrWG4JpXCAmx3Vo7jdQKtWXwJKiRy6JBuDqb1ITDK-hC3Jctk3/exec';
+
   const [webAppUrl, setWebAppUrl] = useState<string>(() => {
     const config = getSavedAppsScriptConfig();
-    return config?.webAppUrl || '';
+    return config?.webAppUrl || DEFAULT_WEB_APP_URL;
   });
 
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => {
@@ -204,7 +254,145 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  // Firebase Cloud Sync States
+  const [firebaseConnected, setFirebaseConnected] = useState<boolean>(true);
+  const [firebaseSyncing, setFirebaseSyncing] = useState<boolean>(false);
+  const [firebaseLastSynced, setFirebaseLastSynced] = useState<Date | null>(null);
+
   const isRemoteUpdateRef = useRef<boolean>(false);
+  const isInitialFirebaseLoadRef = useRef<boolean>(true);
+
+  // Initial load from Firebase & Real-time Listener across devices
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
+    async function initFirebase() {
+      setFirebaseSyncing(true);
+      try {
+        const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+        let appsScriptSuccess = false;
+
+        if (targetUrl) {
+          const appsScriptData = await loadDataFromAppsScript(targetUrl);
+          if (appsScriptData.success && (appsScriptData.students?.length || appsScriptData.subjects?.length)) {
+            appsScriptSuccess = true;
+            isRemoteUpdateRef.current = true;
+            if (appsScriptData.schoolData && Object.keys(appsScriptData.schoolData).length > 0) {
+              setSchoolData(appsScriptData.schoolData);
+            }
+            if (appsScriptData.academicYear && Object.keys(appsScriptData.academicYear).length > 0) {
+              setAcademicYear(appsScriptData.academicYear);
+            }
+            if (appsScriptData.subjects && appsScriptData.subjects.length > 0) {
+              setSubjects(appsScriptData.subjects);
+            }
+            if (appsScriptData.students && appsScriptData.students.length > 0) {
+              setStudents(sanitizeStudentsList(appsScriptData.students));
+            }
+            if (appsScriptData.semesterRecords && appsScriptData.semesterRecords.length > 0) {
+              setSemesterRecords(appsScriptData.semesterRecords);
+            }
+
+            saveAppsScriptConfig({ webAppUrl: targetUrl, lastSyncedAt: new Date().toISOString() });
+
+            await saveToFirebaseFirestore({
+              schoolData: appsScriptData.schoolData || schoolData,
+              academicYear: appsScriptData.academicYear || academicYear,
+              subjects: appsScriptData.subjects || subjects,
+              availableAcademicYears,
+              students: appsScriptData.students ? sanitizeStudentsList(appsScriptData.students) : students,
+              semesterRecords: appsScriptData.semesterRecords || semesterRecords
+            });
+
+            setFirebaseLastSynced(new Date());
+            setTimeout(() => {
+              isRemoteUpdateRef.current = false;
+            }, 800);
+          }
+        }
+
+        if (!appsScriptSuccess) {
+          const cloudData = await loadFromFirebaseFirestore();
+          if (cloudData && (cloudData.students?.length || cloudData.schoolData)) {
+            isRemoteUpdateRef.current = true;
+            if (cloudData.schoolData) setSchoolData(cloudData.schoolData);
+            if (cloudData.academicYear) setAcademicYear(cloudData.academicYear);
+            if (cloudData.subjects && cloudData.subjects.length > 0) setSubjects(cloudData.subjects);
+            if (cloudData.availableAcademicYears && cloudData.availableAcademicYears.length > 0) setAvailableAcademicYears(cloudData.availableAcademicYears);
+            if (cloudData.students && cloudData.students.length > 0) setStudents(sanitizeStudentsList(cloudData.students));
+            if (cloudData.semesterRecords && cloudData.semesterRecords.length > 0) setSemesterRecords(cloudData.semesterRecords);
+            setFirebaseLastSynced(new Date());
+            setTimeout(() => {
+              isRemoteUpdateRef.current = false;
+            }, 800);
+          } else {
+            // If Firestore is empty, seed initial data to Firebase
+            await saveToFirebaseFirestore({
+              schoolData,
+              academicYear,
+              subjects,
+              availableAcademicYears,
+              students,
+              semesterRecords
+            });
+            setFirebaseLastSynced(new Date());
+          }
+        }
+        setFirebaseConnected(true);
+      } catch (err) {
+        console.error('Firebase/AppsScript initialization error:', err);
+      } finally {
+        setFirebaseSyncing(false);
+        isInitialFirebaseLoadRef.current = false;
+      }
+
+      // Realtime listener for multi-device sync
+      unsubscribe = subscribeToFirebaseChanges((updated) => {
+        if (isRemoteUpdateRef.current) return;
+        isRemoteUpdateRef.current = true;
+        if (updated.schoolData) setSchoolData(updated.schoolData);
+        if (updated.academicYear) setAcademicYear(updated.academicYear);
+        if (updated.subjects && updated.subjects.length > 0) setSubjects(updated.subjects);
+        if (updated.availableAcademicYears && updated.availableAcademicYears.length > 0) setAvailableAcademicYears(updated.availableAcademicYears);
+        if (updated.students && updated.students.length > 0) setStudents(sanitizeStudentsList(updated.students));
+        if (updated.semesterRecords) setSemesterRecords(updated.semesterRecords);
+        setFirebaseLastSynced(new Date());
+        setTimeout(() => {
+          isRemoteUpdateRef.current = false;
+        }, 800);
+      });
+    }
+
+    initFirebase();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Automatic Debounced Sync to Firebase Cloud Database on state changes
+  useEffect(() => {
+    if (isInitialFirebaseLoadRef.current) return;
+    if (isRemoteUpdateRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setFirebaseSyncing(true);
+      const res = await saveToFirebaseFirestore({
+        schoolData,
+        academicYear,
+        subjects,
+        availableAcademicYears,
+        students,
+        semesterRecords
+      });
+      setFirebaseSyncing(false);
+      if (res.success) {
+        setFirebaseLastSynced(new Date());
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [schoolData, academicYear, subjects, availableAcademicYears, students, semesterRecords]);
 
   // Automatic Debounced Auto-Sync to Google Apps Script / Google Sheets when state changes
   useEffect(() => {
@@ -397,6 +585,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!id) return;
     const targetId = String(id).trim();
 
+    deleteStudentFromFirestore(targetId);
+
     setStudents(prev => {
       const remaining = prev.filter(s => String(s.id).trim() !== targetId);
       if (selectedStudentId === targetId || (selectedStudentId && String(selectedStudentId).trim() === targetId)) {
@@ -524,6 +714,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Error saving to localStorage:', err);
     }
 
+    setFirebaseSyncing(true);
+    await saveToFirebaseFirestore({
+      schoolData,
+      academicYear,
+      subjects,
+      availableAcademicYears,
+      students,
+      semesterRecords
+    });
+    setFirebaseSyncing(false);
+    setFirebaseLastSynced(new Date());
+
     const activeToken = accessToken || getCachedAccessToken();
     if (webAppUrl || (spreadsheetId && activeToken)) {
       setIsAutoSyncing(true);
@@ -561,7 +763,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    return { success: true, syncedCloud: false };
+    return { success: true, syncedCloud: true };
   };
 
   return (
@@ -585,6 +787,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAssessmentMode,
         activeView,
         setActiveView,
+        firebaseConnected,
+        firebaseSyncing,
+        firebaseLastSynced,
         webAppUrl,
         setWebAppUrl,
         spreadsheetId,

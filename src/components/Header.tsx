@@ -8,9 +8,16 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
-  const { setActiveView, schoolData, academicYear, assessmentMode, setAssessmentMode, isAutoSyncing, webAppUrl, spreadsheetId } = useApp();
-
-  const isConnected = Boolean(webAppUrl || spreadsheetId);
+  const {
+    setActiveView,
+    schoolData,
+    academicYear,
+    assessmentMode,
+    setAssessmentMode,
+    isAutoSyncing,
+    firebaseSyncing,
+    firebaseConnected
+  } = useApp();
 
   return (
     <header className="bg-[#1e3a3f] text-white p-3 sm:p-4 shadow-md sticky top-0 z-30 flex flex-col sm:flex-row items-center justify-between gap-3 border-b-2 border-emerald-500">
@@ -31,33 +38,33 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
               {title}
             </h1>
 
-            {/* Google Sheets Sync Indicator Badge */}
+            {/* Cloud Database Sync Indicator Badge */}
             <button
               type="button"
               onClick={() => setActiveView('integrasi-database')}
-              className={`hidden md:flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer hover:scale-105 ${
-                isAutoSyncing
-                  ? 'bg-amber-900/60 text-amber-200 border-amber-600'
-                  : isConnected
-                  ? 'bg-emerald-900/60 text-emerald-300 border-emerald-600 hover:bg-emerald-800'
+              className={`hidden md:flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition cursor-pointer hover:scale-105 ${
+                firebaseSyncing || isAutoSyncing
+                  ? 'bg-amber-900/80 text-amber-200 border-amber-500 animate-pulse'
+                  : firebaseConnected
+                  ? 'bg-emerald-900/80 text-emerald-200 border-emerald-500 hover:bg-emerald-800'
                   : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
               }`}
-              title="Buka Halaman Admin Integrasi Google Sheets"
+              title="Cloud Database Otomatis - Bebas Pindah Device Tanpa Perlu Link URL"
             >
-              {isAutoSyncing ? (
+              {firebaseSyncing || isAutoSyncing ? (
                 <>
-                  <RefreshCw className="w-3 h-3 animate-spin text-amber-300" />
-                  <span>Syncing...</span>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                  <span>Menyinkronkan Cloud...</span>
                 </>
-              ) : isConnected ? (
+              ) : firebaseConnected ? (
                 <>
-                  <Zap className="w-3 h-3 text-emerald-400 fill-emerald-400" />
-                  <span>Google Sheets Active</span>
+                  <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+                  <span>Cloud Database Aktif (Tanpa URL)</span>
                 </>
               ) : (
                 <>
-                  <Zap className="w-3 h-3 text-slate-400" />
-                  <span>Database GS (Admin)</span>
+                  <Zap className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Database Lokal</span>
                 </>
               )}
             </button>
