@@ -84,7 +84,7 @@ export const PrintIdentitas: React.FC = () => {
               <span className="col-span-1 text-slate-500 font-bold">7.</span>
               <span className="col-span-4">Alamat Tempat Tinggal</span>
               <span className="col-span-1 font-bold">:</span>
-              <span className="col-span-6">{currentStudent.alamatSiswa}, RT/RW {currentStudent.rtRw}</span>
+              <span className="col-span-6">{currentStudent.alamatSiswa}</span>
 
               <span className="col-span-1 text-slate-500 font-bold">8.</span>
               <span className="col-span-4">Tinggal Dengan</span>
