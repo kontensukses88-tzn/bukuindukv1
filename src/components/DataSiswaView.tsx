@@ -38,6 +38,10 @@ export const DataSiswaView: React.FC = () => {
   const [newKelas, setNewKelas] = useState<string | number>(() => rombelList[0] || '1A');
   const [newTingkatSaatIni, setNewTingkatSaatIni] = useState<string>(() => rombelList[0] || 'Tingkat 1');
   const [newTahunAjaran, setNewTahunAjaran] = useState<string>(() => academicYear.tahunAjaran);
+  const [newAnakKe, setNewAnakKe] = useState<number>(1);
+  const [newAlamatSiswa, setNewAlamatSiswa] = useState('Jl. Merdeka No. 1');
+  const [newTanggalDiterima, setNewTanggalDiterima] = useState('2024-07-15');
+  const [newSekolahAsal, setNewSekolahAsal] = useState('TK/PAUD');
 
   // Status counts
   const countAktif = students.filter(s => s.statusSiswa === 'Aktif').length;
@@ -73,13 +77,13 @@ export const DataSiswaView: React.FC = () => {
       tanggalLahir: newTanggalLahir,
       agama: 'Islam',
       kewarganegaraan: 'WNI',
-      anakKe: 1,
+      anakKe: Number(newAnakKe) || 1,
       jumlahSaudaraKandung: 1,
       jumlahSaudaraTiri: 0,
       jumlahSaudaraAngkat: 0,
       statusAnak: 'Kandung',
       bahasaSehariHari: 'Bahasa Indonesia',
-      alamatSiswa: 'Jl. Merdeka No. 1',
+      alamatSiswa: newAlamatSiswa || 'Jl. Merdeka No. 1',
       rtRw: '001/001',
       dusunDesa: 'Citarum',
       kecamatan: 'Bandung Wetan',
@@ -87,9 +91,9 @@ export const DataSiswaView: React.FC = () => {
       tinggalDengan: 'Orang Tua',
       jarakKeSekolah: '1 km',
       transportasi: 'Jalan Kaki',
-      sekolahAsal: 'TK/PAUD',
+      sekolahAsal: newSekolahAsal || 'TK/PAUD',
       diterimaDiKelas: newKelas,
-      tanggalDiterima: '2024-07-15',
+      tanggalDiterima: newTanggalDiterima || '2024-07-15',
       tingkatSaatIni: newTingkatSaatIni || (String(newKelas).startsWith('Tingkat') ? String(newKelas) : `Tingkat ${newKelas}`),
       tahunAjaran: newTahunAjaran || academicYear.tahunAjaran,
       statusSiswa: 'Aktif',
@@ -109,7 +113,7 @@ export const DataSiswaView: React.FC = () => {
         pendidikanIbu: 'SMA',
         pekerjaanIbu: 'Ibu Rumah Tangga',
         penghasilanIbu: '-',
-        alamatOrangTua: 'Jl. Merdeka No. 1',
+        alamatOrangTua: newAlamatSiswa || 'Jl. Merdeka No. 1',
         noHpOrangTua: '081200000000'
       },
       physicalData: {
@@ -127,6 +131,10 @@ export const DataSiswaView: React.FC = () => {
     setNewNis('');
     setNewNisn('');
     setNewNama('');
+    setNewAnakKe(1);
+    setNewAlamatSiswa('Jl. Merdeka No. 1');
+    setNewTanggalDiterima('2024-07-15');
+    setNewSekolahAsal('TK/PAUD');
   };
 
   const handleBulkExcelImport = (importedList: Omit<StudentDetail, 'id'>[]) => {
@@ -526,7 +534,7 @@ export const DataSiswaView: React.FC = () => {
       {/* Add Student Manual Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">
               Tambah Siswa Baru (Manual)
             </h3>
@@ -662,6 +670,60 @@ export const DataSiswaView: React.FC = () => {
                     className="w-full border border-slate-300 rounded-xl px-3 py-2"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Anak Ke -
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newAnakKe}
+                    onChange={e => setNewAnakKe(parseInt(e.target.value) || 1)}
+                    placeholder="Contoh: 1"
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Tanggal Diterima
+                  </label>
+                  <input
+                    type="date"
+                    value={newTanggalDiterima}
+                    onChange={e => setNewTanggalDiterima(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Sekolah Asal (TK / PAUD)
+                </label>
+                <input
+                  type="text"
+                  value={newSekolahAsal}
+                  onChange={e => setNewSekolahAsal(e.target.value)}
+                  placeholder="Contoh: TK Pembina / PAUD Kasih Ibu"
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Alamat Siswa
+                </label>
+                <textarea
+                  rows={2}
+                  value={newAlamatSiswa}
+                  onChange={e => setNewAlamatSiswa(e.target.value)}
+                  placeholder="Alamat tempat tinggal siswa..."
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2 resize-none"
+                />
               </div>
 
               <div className="flex justify-end space-x-2 pt-3 border-t">
