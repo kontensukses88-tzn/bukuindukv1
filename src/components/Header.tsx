@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
               ) : firebaseConnected ? (
                 <>
                   <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
-                  <span>Cloud Database Aktif (Tanpa URL)</span>
+                  <span>Online</span>
                 </>
               ) : (
                 <>
