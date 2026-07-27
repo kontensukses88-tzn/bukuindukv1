@@ -47,7 +47,7 @@ export const PrintCover: React.FC = () => {
             SEKOLAH DASAR (SD)
           </p>
           <div className="text-sm font-semibold italic text-slate-700">
-            Kurikulum: {academicYear.kurikulum} &bull; T.A {academicYear.tahunAjaran}
+            {academicYear.kurikulum} &bull; T.A {academicYear.tahunAjaran}
           </div>
         </div>
 
