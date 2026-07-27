@@ -105,13 +105,13 @@ export const PrintIndexSiswa: React.FC = () => {
             <p className="font-normal leading-tight">Mengetahui,</p>
             <p className="font-bold leading-tight uppercase">Kepala Sekolah {schoolData.namaSekolah}</p>
             <div className="h-20"></div> {/* Clear space for signature & official stamp */}
-            <p className="font-black underline uppercase text-sm">{schoolData.namaKepalaSekolah}</p>
+            <p className="font-black underline propercase text-sm">{schoolData.namaKepalaSekolah}</p>
             <p className="text-[11px] font-bold text-slate-700">NIP. {schoolData.nipKepalaSekolah}</p>
           </div>
 
           <div className="text-center w-64">
             <p className="font-normal leading-tight">{schoolData.kabupaten}, {academicYear.tanggalRapor}</p>
-            <p className="font-bold leading-tight uppercase">Petugas Induk Siswa</p>
+            <p className="font-bold leading-tight propercase">Petugas Induk Siswa</p>
             <div className="h-20"></div> {/* Clear space for signature */}
             <p className="font-black underline uppercase text-sm">_______________________</p>
             <p className="text-[11px] font-bold text-slate-700">NIP. .....................................</p>
