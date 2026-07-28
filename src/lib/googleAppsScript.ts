@@ -481,40 +481,61 @@ function loadAllDataFromSheets(ss) {
   var students = [];
   var sheetSiswa = ss.getSheetByName("Data_Siswa");
   if (sheetSiswa && sheetSiswa.getLastRow() > 1) {
-    var maxCol = Math.max(sheetSiswa.getLastColumn(), 41);
+    var maxCol = Math.max(sheetSiswa.getLastColumn(), 42);
     var hdrRow = sheetSiswa.getRange(1, 1, 1, maxCol).getValues()[0];
     
-    var tkIndex = -1;
+    var colMap = {};
     for (var hc = 0; hc < hdrRow.length; hc++) {
-      if (String(hdrRow[hc]).trim().toLowerCase() === "tingkat saat ini") {
-        tkIndex = hc;
-        break;
-      }
+      var hName = String(hdrRow[hc]).trim().toLowerCase();
+      if (hName) colMap[hName] = hc;
     }
     
+    var tkIndex = colMap["tingkat saat ini"] !== undefined ? colMap["tingkat saat ini"] : -1;
+    var stIndex = colMap["status siswa"] !== undefined ? colMap["status siswa"] : -1;
+
     var stdRows = sheetSiswa.getRange(2, 1, sheetSiswa.getLastRow() - 1, maxCol).getValues();
     for (var m = 0; m < stdRows.length; m++) {
       var r = stdRows[m];
-      var namaLengkap = String(r[3] || "").trim();
-      var nis = String(r[1] || "").trim();
+      var namaLengkap = String(r[colMap["nama lengkap"] !== undefined ? colMap["nama lengkap"] : 3] || "").trim();
+      var nis = String(r[colMap["nis"] !== undefined ? colMap["nis"] : 1] || "").trim();
       if (!namaLengkap && !nis) continue;
 
       var hasTkCol = (tkIndex !== -1) || (hdrRow.length >= 42);
       var offset = hasTkCol ? 1 : 0;
       
-      var ditKelas = String(r[23] || "1A").trim();
+      var ditKelas = String(r[colMap["diterima di kelas"] !== undefined ? colMap["diterima di kelas"] : 23] || "1A").trim();
       var tingkatVal = "";
       if (tkIndex !== -1) {
         tingkatVal = String(r[tkIndex] || "").trim();
       } else if (hasTkCol && r[25]) {
         tingkatVal = String(r[25] || "").trim();
       }
-      if (!tingkatVal) {
-        tingkatVal = ditKelas;
+
+      var statusVal = "";
+      if (stIndex !== -1) {
+        statusVal = String(r[stIndex] || "").trim();
+      } else {
+        statusVal = String(r[25 + offset] || "Aktif").trim();
       }
 
-      var parentJsonCol = 39 + offset;
-      var physJsonCol = 40 + offset;
+      // Validate & repair if statusVal contains level text e.g. "Tingkat 6"
+      var validStatuses = ["aktif", "lulus", "pindah", "keluar", "do", "non-aktif", "alumni"];
+      var isInvalidStatus = !validStatuses.includes(statusVal.toLowerCase());
+      if (isInvalidStatus || /tingkat/i.test(statusVal)) {
+        if (!tingkatVal || tingkatVal.toLowerCase() === "aktif" || isInvalidStatus) {
+          if (/tingkat/i.test(statusVal) || /\d/.test(statusVal)) {
+            tingkatVal = statusVal;
+          }
+        }
+        statusVal = "Aktif";
+      }
+
+      if (!tingkatVal || tingkatVal.toLowerCase() === "aktif") {
+        tingkatVal = (ditKelas.indexOf("Tingkat") === 0) ? ditKelas : ("Tingkat " + ditKelas);
+      }
+
+      var parentJsonCol = colMap["parent data (json)"] !== undefined ? colMap["parent data (json)"] : (39 + offset);
+      var physJsonCol = colMap["physical data (json)"] !== undefined ? colMap["physical data (json)"] : (40 + offset);
 
       var parentData = {};
       try {
@@ -530,53 +551,53 @@ function loadAllDataFromSheets(ss) {
       students.push({
         id: String(r[0] ? String(r[0]).trim() : (nis ? "STD-" + nis : "STD-IDX-" + (m + 1))),
         nis: nis,
-        nisn: String(r[2] || "").trim(),
+        nisn: String(r[colMap["nisn"] !== undefined ? colMap["nisn"] : 2] || "").trim(),
         namaLengkap: namaLengkap,
-        namaPanggilan: String(r[4] || "").trim(),
-        jenisKelamin: String(r[5] || "").toUpperCase().startsWith("P") ? "P" : "L",
-        tempatLahir: String(r[6] || "").trim(),
-        tanggalLahir: String(r[7] || "").trim(),
-        agama: String(r[8] || "Islam").trim(),
-        kewarganegaraan: String(r[9] || "Indonesia").trim(),
-        statusAnak: String(r[10] || "Kandung").trim(),
-        anakKe: Number(r[11]) || 1,
-        jumlahSaudaraKandung: Number(r[12]) || 0,
+        namaPanggilan: String(r[colMap["nama panggilan"] !== undefined ? colMap["nama panggilan"] : 4] || "").trim(),
+        jenisKelamin: String(r[colMap["jenis kelamin"] !== undefined ? colMap["jenis kelamin"] : 5] || "").toUpperCase().startsWith("P") ? "P" : "L",
+        tempatLahir: String(r[colMap["tempat lahir"] !== undefined ? colMap["tempat lahir"] : 6] || "").trim(),
+        tanggalLahir: String(r[colMap["tanggal lahir"] !== undefined ? colMap["tanggal lahir"] : 7] || "").trim(),
+        agama: String(r[colMap["agama"] !== undefined ? colMap["agama"] : 8] || "Islam").trim(),
+        kewarganegaraan: String(r[colMap["kewarganegaraan"] !== undefined ? colMap["kewarganegaraan"] : 9] || "Indonesia").trim(),
+        statusAnak: String(r[colMap["status anak"] !== undefined ? colMap["status anak"] : 10] || "Kandung").trim(),
+        anakKe: Number(r[colMap["anak ke"] !== undefined ? colMap["anak ke"] : 11]) || 1,
+        jumlahSaudaraKandung: Number(r[colMap["jumlah saudara kandung"] !== undefined ? colMap["jumlah saudara kandung"] : 12]) || 0,
         jumlahSaudaraTiri: 0,
         jumlahSaudaraAngkat: 0,
-        bahasaSehariHari: String(r[13] || "Indonesia").trim(),
-        alamatSiswa: String(r[14] || "").trim(),
-        rtRw: String(r[15] || "").trim(),
-        dusunDesa: String(r[16] || "").trim(),
-        kecamatan: String(r[17] || "").trim(),
-        kabupaten: String(r[18] || "").trim(),
-        tinggalDengan: String(r[19] || "Orang Tua").trim(),
-        jarakKeSekolah: String(r[20] || "").trim(),
-        transportasi: String(r[21] || "").trim(),
-        sekolahAsal: String(r[22] || "").trim(),
+        bahasaSehariHari: String(r[colMap["bahasa sehari-hari"] !== undefined ? colMap["bahasa sehari-hari"] : 13] || "Indonesia").trim(),
+        alamatSiswa: String(r[colMap["alamat siswa"] !== undefined ? colMap["alamat siswa"] : 14] || "").trim(),
+        rtRw: String(r[colMap["rt rw"] !== undefined ? colMap["rt rw"] : 15] || "").trim(),
+        dusunDesa: String(r[colMap["desa/dusun"] !== undefined ? colMap["desa/dusun"] : 16] || "").trim(),
+        kecamatan: String(r[colMap["kecamatan"] !== undefined ? colMap["kecamatan"] : 17] || "").trim(),
+        kabupaten: String(r[colMap["kabupaten"] !== undefined ? colMap["kabupaten"] : 18] || "").trim(),
+        tinggalDengan: String(r[colMap["tinggal dengan"] !== undefined ? colMap["tinggal dengan"] : 19] || "Orang Tua").trim(),
+        jarakKeSekolah: String(r[colMap["jarak ke sekolah"] !== undefined ? colMap["jarak ke sekolah"] : 20] || "").trim(),
+        transportasi: String(r[colMap["transportasi"] !== undefined ? colMap["transportasi"] : 21] || "").trim(),
+        sekolahAsal: String(r[colMap["sekolah asal"] !== undefined ? colMap["sekolah asal"] : 22] || "").trim(),
         diterimaDiKelas: ditKelas,
-        tanggalDiterima: String(r[24] || "").trim(),
+        tanggalDiterima: String(r[colMap["tanggal diterima"] !== undefined ? colMap["tanggal diterima"] : 24] || "").trim(),
         tingkatSaatIni: tingkatVal,
-        statusSiswa: String(r[25 + offset] || "Aktif").trim(),
-        tahunLulus: String(r[26 + offset] || "").trim(),
-        noIjazah: String(r[27 + offset] || "").trim(),
-        fotoUrl: String(r[28 + offset] || "").trim(),
+        statusSiswa: statusVal,
+        tahunLulus: String(r[colMap["tahun lulus"] !== undefined ? colMap["tahun lulus"] : (26 + offset)] || "").trim(),
+        noIjazah: String(r[colMap["no ijazah"] !== undefined ? colMap["no ijazah"] : (27 + offset)] || "").trim(),
+        fotoUrl: String(r[colMap["foto url"] !== undefined ? colMap["foto url"] : (28 + offset)] || "").trim(),
         parentData: {
-          namaAyah: parentData.namaAyah || String(r[29 + offset] || "").trim(),
-          nikAyah: parentData.nikAyah || String(r[30 + offset] || "").trim(),
+          namaAyah: parentData.namaAyah || String(r[colMap["ayah"] !== undefined ? colMap["ayah"] : (29 + offset)] || "").trim(),
+          nikAyah: parentData.nikAyah || String(r[colMap["nik ayah"] !== undefined ? colMap["nik ayah"] : (30 + offset)] || "").trim(),
           tahunLahirAyah: parentData.tahunLahirAyah || '1980',
           pendidikanAyah: parentData.pendidikanAyah || 'SMA',
-          pekerjaanAyah: parentData.pekerjaanAyah || String(r[31 + offset] || "").trim(),
+          pekerjaanAyah: parentData.pekerjaanAyah || String(r[colMap["pekerjaan ayah"] !== undefined ? colMap["pekerjaan ayah"] : (31 + offset)] || "").trim(),
           penghasilanAyah: parentData.penghasilanAyah || 'Rp 3.000.000 - Rp 5.000.000',
-          namaIbu: parentData.namaIbu || String(r[32 + offset] || "").trim(),
-          nikIbu: parentData.nikIbu || String(r[33 + offset] || "").trim(),
+          namaIbu: parentData.namaIbu || String(r[colMap["ibu"] !== undefined ? colMap["ibu"] : (32 + offset)] || "").trim(),
+          nikIbu: parentData.nikIbu || String(r[colMap["nik ibu"] !== undefined ? colMap["nik ibu"] : (33 + offset)] || "").trim(),
           tahunLahirIbu: parentData.tahunLahirIbu || '1982',
           pendidikanIbu: parentData.pendidikanIbu || 'SMA',
-          pekerjaanIbu: parentData.pekerjaanIbu || String(r[34 + offset] || "").trim(),
+          pekerjaanIbu: parentData.pekerjaanIbu || String(r[colMap["pekerjaan ibu"] !== undefined ? colMap["pekerjaan ibu"] : (34 + offset)] || "").trim(),
           penghasilanIbu: parentData.penghasilanIbu || 'Tidak Berpenghasilan',
-          noHpOrangTua: parentData.noHpOrangTua || String(r[35 + offset] || "").trim(),
-          namaWali: parentData.namaWali || String(r[36 + offset] || "").trim(),
-          pekerjaanWali: parentData.pekerjaanWali || String(r[37 + offset] || "").trim(),
-          alamatOrangTua: parentData.alamatOrangTua || String(r[38 + offset] || r[14] || "").trim()
+          noHpOrangTua: parentData.noHpOrangTua || String(r[colMap["no hp orang tua"] !== undefined ? colMap["no hp orang tua"] : (35 + offset)] || "").trim(),
+          namaWali: parentData.namaWali || String(r[colMap["wali"] !== undefined ? colMap["wali"] : (36 + offset)] || "").trim(),
+          pekerjaanWali: parentData.pekerjaanWali || String(r[colMap["pekerjaan wali"] !== undefined ? colMap["pekerjaan wali"] : (37 + offset)] || "").trim(),
+          alamatOrangTua: parentData.alamatOrangTua || String(r[colMap["alamat orang tua"] !== undefined ? colMap["alamat orang tua"] : (38 + offset)] || "").trim()
         },
         physicalData: physicalData
       });
@@ -804,6 +825,7 @@ const formatRtRwStr = (val: any) => {
 
 export const sanitizeStudentsList = (rawStudents: any[]): StudentDetail[] => {
   if (!Array.isArray(rawStudents)) return [];
+  const VALID_STATUSES = ['Aktif', 'Lulus', 'Pindah', 'Keluar', 'Non-Aktif', 'Alumni', 'DO'];
   const seenIds = new Set<string>();
   return rawStudents.map((s, idx) => {
     let id = s.id ? String(s.id).trim() : `std-${Date.now()}-${idx}`;
@@ -811,13 +833,32 @@ export const sanitizeStudentsList = (rawStudents: any[]): StudentDetail[] => {
       id = `${id}-dup${idx + 1}`;
     }
     seenIds.add(id);
+
     const diterimaDiKelas = s.diterimaDiKelas || '1A';
-    const tingkatSaatIni = s.tingkatSaatIni || (String(diterimaDiKelas).startsWith('Tingkat') ? String(diterimaDiKelas) : `Tingkat ${diterimaDiKelas}`);
+    let statusSiswa = String(s.statusSiswa || 'Aktif').trim();
+    let tingkatSaatIni = String(s.tingkatSaatIni || '').trim();
+
+    // Detect if statusSiswa is actually a class level (e.g. "Tingkat 6", "1A", etc.)
+    const isInvalidStatus = !VALID_STATUSES.some(v => v.toLowerCase() === statusSiswa.toLowerCase());
+    if (isInvalidStatus || /tingkat/i.test(statusSiswa)) {
+      if (!tingkatSaatIni || tingkatSaatIni === 'Aktif' || isInvalidStatus) {
+        if (/tingkat/i.test(statusSiswa) || /\d/.test(statusSiswa)) {
+          tingkatSaatIni = statusSiswa;
+        }
+      }
+      statusSiswa = 'Aktif';
+    }
+
+    if (!tingkatSaatIni || tingkatSaatIni === 'Aktif') {
+      tingkatSaatIni = String(diterimaDiKelas).startsWith('Tingkat') ? String(diterimaDiKelas) : `Tingkat ${diterimaDiKelas}`;
+    }
+
     return {
       ...s,
       id,
       diterimaDiKelas,
       tingkatSaatIni,
+      statusSiswa: statusSiswa as any,
       tanggalLahir: formatDateStr(s.tanggalLahir),
       tanggalDiterima: formatDateStr(s.tanggalDiterima),
       rtRw: formatRtRwStr(s.rtRw)

@@ -153,6 +153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const sanitizeStudentsList = (rawStudents: StudentDetail[]): StudentDetail[] => {
     if (!Array.isArray(rawStudents)) return [];
+    const VALID_STATUSES = ['Aktif', 'Lulus', 'Pindah', 'Keluar', 'Non-Aktif', 'Alumni', 'DO'];
     const seenIds = new Set<string>();
     return rawStudents.map((s, idx) => {
       let id = s.id ? String(s.id).trim() : '';
@@ -163,9 +164,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         id = `${id}-dup${idx + 1}`;
       }
       seenIds.add(id);
+
+      const diterimaDiKelas = s.diterimaDiKelas || '1A';
+      let statusSiswa = String(s.statusSiswa || 'Aktif').trim();
+      let tingkatSaatIni = String(s.tingkatSaatIni || '').trim();
+
+      // Detect if statusSiswa is actually a class level (e.g. "Tingkat 6", "1A", etc.)
+      const isInvalidStatus = !VALID_STATUSES.some(v => v.toLowerCase() === statusSiswa.toLowerCase());
+      if (isInvalidStatus || /tingkat/i.test(statusSiswa)) {
+        if (!tingkatSaatIni || tingkatSaatIni === 'Aktif' || isInvalidStatus) {
+          if (/tingkat/i.test(statusSiswa) || /\d/.test(statusSiswa)) {
+            tingkatSaatIni = statusSiswa;
+          }
+        }
+        statusSiswa = 'Aktif';
+      }
+
+      if (!tingkatSaatIni || tingkatSaatIni === 'Aktif') {
+        tingkatSaatIni = String(diterimaDiKelas).startsWith('Tingkat') ? String(diterimaDiKelas) : `Tingkat ${diterimaDiKelas}`;
+      }
+
       return {
         ...s,
         id,
+        diterimaDiKelas,
+        tingkatSaatIni,
+        statusSiswa: statusSiswa as any,
         tanggalLahir: formatDateStr(s.tanggalLahir),
         tanggalDiterima: formatDateStr(s.tanggalDiterima),
         rtRw: formatRtRwStr(s.rtRw)

@@ -372,12 +372,12 @@ export const DataSiswaView: React.FC = () => {
                       </td>
                       <td className="p-3 text-center">
                         <span className={`font-black px-2.5 py-1 rounded-full text-[10px] uppercase border shadow-sm ${
-                          s.statusSiswa === 'Aktif' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                          s.statusSiswa === 'Aktif' || !['Lulus', 'Pindah', 'Keluar'].includes(s.statusSiswa) ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
                           s.statusSiswa === 'Lulus' ? 'bg-sky-100 text-sky-800 border-sky-300' :
                           s.statusSiswa === 'Pindah' ? 'bg-amber-100 text-amber-800 border-amber-300' :
                           'bg-rose-100 text-rose-800 border-rose-300'
                         }`}>
-                          {s.statusSiswa === 'Keluar' ? 'Keluar / DO' : s.statusSiswa === 'Pindah' ? 'Pindah Sekolah' : s.statusSiswa}
+                          {s.statusSiswa === 'Keluar' ? 'Keluar / DO' : s.statusSiswa === 'Pindah' ? 'Pindah Sekolah' : (['Aktif', 'Lulus', 'Pindah', 'Keluar'].includes(s.statusSiswa) ? s.statusSiswa : 'Aktif')}
                         </span>
                       </td>
                       <td className="p-3 text-center">
