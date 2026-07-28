@@ -21,7 +21,7 @@ export const PrintBukuIndukTanpa: React.FC = () => {
           <h1 className="font-black text-lg uppercase tracking-wider">{schoolData.namaSekolah}</h1>
           <h2 className="font-bold text-sm uppercase">LEMBAR BUKU INDUK SISWA (NILAI ANGKA & PREDIKAT)</h2>
           <p className="text-[11px] text-slate-700 font-semibold">
-            KELAS {selectedClass} &bull; SEMESTER {selectedSemester}
+            KELAS {selectedClass} &bull; SEMESTER {selectedSemester} &bull; TAHUN AJARAN {academicYear.tahunAjaran}
           </p>
         </div>
 
@@ -110,13 +110,13 @@ export const PrintBukuIndukTanpa: React.FC = () => {
             <p className="font-normal leading-tight">Mengetahui,</p>
             <p className="font-bold leading-tight uppercase">Kepala Sekolah {schoolData.namaSekolah}</p>
             <div className="h-20"></div>
-            <p className="font-black underline propercase text-sm">{schoolData.namaKepalaSekolah}</p>
+            <p className="font-black underline uppercase text-sm">{schoolData.namaKepalaSekolah}</p>
             <p className="text-[11px] font-bold text-slate-700">NIP. {schoolData.nipKepalaSekolah}</p>
           </div>
 
           <div className="text-center w-64">
             <p className="font-normal leading-tight">{schoolData.kabupaten}, {academicYear.tanggalRapor || '........................'}</p>
-            <p className="font-bold leading-tight propercase">Petugas Induk Siswa</p>
+            <p className="font-bold leading-tight uppercase">Petugas Induk Siswa</p>
             <div className="h-20"></div>
             <p className="font-black underline uppercase text-sm">_______________________</p>
             <p className="text-[11px] font-bold text-slate-700">NIP. .....................................</p>

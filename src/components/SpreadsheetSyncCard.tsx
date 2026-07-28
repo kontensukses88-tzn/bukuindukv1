@@ -548,8 +548,11 @@ export const SpreadsheetSyncCard: React.FC = () => {
     setIsPulling(false);
 
     if (result.success) {
-      if (result.schoolData) setSchoolData(result.schoolData);
-      if (result.academicYear) setAcademicYear(result.academicYear);
+      setWebAppUrl(targetUrl);
+      saveAppsScriptConfig({ webAppUrl: targetUrl, lastSyncedAt: new Date().toISOString() });
+
+      if (result.schoolData && Object.keys(result.schoolData).length > 0) setSchoolData(result.schoolData);
+      if (result.academicYear && Object.keys(result.academicYear).length > 0) setAcademicYear(result.academicYear);
       if (result.students && result.students.length > 0) setStudents(result.students);
       if (result.semesterRecords && result.semesterRecords.length > 0) setSemesterRecords(result.semesterRecords);
       if (result.subjects && result.subjects.length > 0) setSubjects(result.subjects);

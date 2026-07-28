@@ -19,7 +19,7 @@ export const PrintIdentitas: React.FC = () => {
         {/* Kop Surat Sekolah */}
         <div className="border-b-4 border-double border-black pb-3 text-center space-y-1">
           <h2 className="font-extrabold text-base tracking-wider uppercase">
-            PEMERINTAH {schoolData.kabupaten.toUpperCase()}
+            PEMERINTAH KOTA / KABUPATEN {schoolData.kabupaten.toUpperCase()}
           </h2>
           <h1 className="font-black text-xl uppercase tracking-widest text-slate-900">
             {schoolData.namaSekolah}
@@ -84,7 +84,7 @@ export const PrintIdentitas: React.FC = () => {
               <span className="col-span-1 text-slate-500 font-bold">7.</span>
               <span className="col-span-4">Alamat Tempat Tinggal</span>
               <span className="col-span-1 font-bold">:</span>
-              <span className="col-span-6">{currentStudent.alamatSiswa}</span>
+              <span className="col-span-6">{currentStudent.alamatSiswa}, RT/RW {currentStudent.rtRw}</span>
 
               <span className="col-span-1 text-slate-500 font-bold">8.</span>
               <span className="col-span-4">Tinggal Dengan</span>
@@ -176,7 +176,7 @@ export const PrintIdentitas: React.FC = () => {
             
             <div className="h-16"></div>
 
-            <p className="font-black underline propercase text-sm">{schoolData.namaKepalaSekolah}</p>
+            <p className="font-black underline uppercase text-sm">{schoolData.namaKepalaSekolah}</p>
             <p className="text-xs font-sans">NIP. {schoolData.nipKepalaSekolah}</p>
           </div>
         </div>

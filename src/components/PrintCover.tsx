@@ -31,10 +31,10 @@ export const PrintCover: React.FC = () => {
             )}
           </div>
           <h2 className="text-xl font-bold tracking-widest uppercase">
-            PEMERINTAH {schoolData.kabupaten.toUpperCase()}
+            PEMERINTAH KOTA / KABUPATEN {schoolData.kabupaten.toUpperCase()}
           </h2>
           <h3 className="text-base font-semibold uppercase tracking-wider">
-            {schoolData.namaSekolah.toUpperCase()}
+            DINAS PENDIDIKAN DAN KEBUDAYAAN
           </h3>
         </div>
 
@@ -47,7 +47,7 @@ export const PrintCover: React.FC = () => {
             SEKOLAH DASAR (SD)
           </p>
           <div className="text-sm font-semibold italic text-slate-700">
-            {academicYear.kurikulum} &bull; T.A {academicYear.tahunAjaran}
+            Kurikulum: {academicYear.kurikulum} &bull; T.A {academicYear.tahunAjaran}
           </div>
         </div>
 

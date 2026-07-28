@@ -148,18 +148,33 @@ function setupDatabase() {
 
   // 4. Sheet Data_Siswa
   var sheetSiswa = getOrCreateSheet(ss, "Data_Siswa");
+  var siswaHeaders = [
+    "ID", "NIS", "NISN", "Nama Lengkap", "Nama Panggilan", "Jenis Kelamin",
+    "Tempat Lahir", "Tanggal Lahir", "Agama", "Kewarganegaraan", "Status Anak",
+    "Anak Ke", "Jumlah Saudara Kandung", "Bahasa Sehari-hari", "Alamat Siswa",
+    "RT RW", "Desa/Dusun", "Kecamatan", "Kabupaten", "Tinggal Dengan",
+    "Jarak ke Sekolah", "Transportasi", "Sekolah Asal", "Diterima di Kelas",
+    "Tanggal Diterima", "Tingkat Saat Ini", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
+    "Ayah", "NIK Ayah", "Pekerjaan Ayah", "Ibu", "NIK Ibu", "Pekerjaan Ibu",
+    "No HP Orang Tua", "Wali", "Pekerjaan Wali", "Alamat Orang Tua",
+    "Parent Data (JSON)", "Physical Data (JSON)"
+  ];
   if (sheetSiswa.getLastRow() === 0) {
-    sheetSiswa.appendRow([
-      "ID", "NIS", "NISN", "Nama Lengkap", "Nama Panggilan", "Jenis Kelamin",
-      "Tempat Lahir", "Tanggal Lahir", "Agama", "Kewarganegaraan", "Status Anak",
-      "Anak Ke", "Jumlah Saudara Kandung", "Bahasa Sehari-hari", "Alamat Siswa",
-      "RT RW", "Desa/Dusun", "Kecamatan", "Kabupaten", "Tinggal Dengan",
-      "Jarak ke Sekolah", "Transportasi", "Sekolah Asal", "Diterima di Kelas",
-      "Tanggal Diterima", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
-      "Ayah", "NIK Ayah", "Pekerjaan Ayah", "Ibu", "NIK Ibu", "Pekerjaan Ibu",
-      "No HP Orang Tua", "Wali", "Pekerjaan Wali", "Alamat Orang Tua",
-      "Parent Data (JSON)", "Physical Data (JSON)"
-    ]);
+    sheetSiswa.appendRow(siswaHeaders);
+  } else {
+    // Check if "Tingkat Saat Ini" is missing from header row
+    var curHeaders = sheetSiswa.getRange(1, 1, 1, Math.max(1, sheetSiswa.getLastColumn())).getValues()[0];
+    var hasTingkat = false;
+    for (var ch = 0; ch < curHeaders.length; ch++) {
+      if (String(curHeaders[ch]).trim().toLowerCase() === "tingkat saat ini") {
+        hasTingkat = true;
+        break;
+      }
+    }
+    if (!hasTingkat && curHeaders.length >= 25) {
+      sheetSiswa.insertColumnAfter(25);
+      sheetSiswa.getRange(1, 26).setValue("Tingkat Saat Ini");
+    }
   }
   formatHeaderRow(sheetSiswa, "#047857");
 
@@ -352,7 +367,7 @@ function saveAllDataToSheets(ss, data) {
       "Anak Ke", "Jumlah Saudara Kandung", "Bahasa Sehari-hari", "Alamat Siswa",
       "RT RW", "Desa/Dusun", "Kecamatan", "Kabupaten", "Tinggal Dengan",
       "Jarak ke Sekolah", "Transportasi", "Sekolah Asal", "Diterima di Kelas",
-      "Tanggal Diterima", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
+      "Tanggal Diterima", "Tingkat Saat Ini", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
       "Ayah", "NIK Ayah", "Pekerjaan Ayah", "Ibu", "NIK Ibu", "Pekerjaan Ibu",
       "No HP Orang Tua", "Wali", "Pekerjaan Wali", "Alamat Orang Tua",
       "Parent Data (JSON)", "Physical Data (JSON)"
@@ -360,6 +375,7 @@ function saveAllDataToSheets(ss, data) {
     for (var j = 0; j < data.students.length; j++) {
       var std = data.students[j];
       var p = std.parentData || {};
+      var tk = std.tingkatSaatIni || std.diterimaDiKelas || "";
       sheetSiswa.appendRow([
         std.id || "", std.nis || "", std.nisn || "", std.namaLengkap || "",
         std.namaPanggilan || "", std.jenisKelamin || "L", std.tempatLahir || "",
@@ -369,6 +385,7 @@ function saveAllDataToSheets(ss, data) {
         std.dusunDesa || "", std.kecamatan || "", std.kabupaten || "",
         std.tinggalDengan || "Orang Tua", std.jarakKeSekolah || "", std.transportasi || "",
         std.sekolahAsal || "", std.diterimaDiKelas || "1A", std.tanggalDiterima || "",
+        tk,
         std.statusSiswa || "Aktif", std.tahunLulus || "", std.noIjazah || "",
         std.fotoUrl || "", p.namaAyah || "", p.nikAyah || "", p.pekerjaanAyah || "",
         p.namaIbu || "", p.nikIbu || "", p.pekerjaanIbu || "", p.noHpOrangTua || "",
@@ -464,22 +481,50 @@ function loadAllDataFromSheets(ss) {
   var students = [];
   var sheetSiswa = ss.getSheetByName("Data_Siswa");
   if (sheetSiswa && sheetSiswa.getLastRow() > 1) {
-    var stdRows = sheetSiswa.getRange(2, 1, sheetSiswa.getLastRow() - 1, 41).getValues();
+    var maxCol = Math.max(sheetSiswa.getLastColumn(), 41);
+    var hdrRow = sheetSiswa.getRange(1, 1, 1, maxCol).getValues()[0];
+    
+    var tkIndex = -1;
+    for (var hc = 0; hc < hdrRow.length; hc++) {
+      if (String(hdrRow[hc]).trim().toLowerCase() === "tingkat saat ini") {
+        tkIndex = hc;
+        break;
+      }
+    }
+    
+    var stdRows = sheetSiswa.getRange(2, 1, sheetSiswa.getLastRow() - 1, maxCol).getValues();
     for (var m = 0; m < stdRows.length; m++) {
       var r = stdRows[m];
       var namaLengkap = String(r[3] || "").trim();
       var nis = String(r[1] || "").trim();
       if (!namaLengkap && !nis) continue;
 
+      var hasTkCol = (tkIndex !== -1) || (hdrRow.length >= 42);
+      var offset = hasTkCol ? 1 : 0;
+      
+      var ditKelas = String(r[23] || "1A").trim();
+      var tingkatVal = "";
+      if (tkIndex !== -1) {
+        tingkatVal = String(r[tkIndex] || "").trim();
+      } else if (hasTkCol && r[25]) {
+        tingkatVal = String(r[25] || "").trim();
+      }
+      if (!tingkatVal) {
+        tingkatVal = ditKelas;
+      }
+
+      var parentJsonCol = 39 + offset;
+      var physJsonCol = 40 + offset;
+
       var parentData = {};
       try {
-        if (r[39]) parentData = JSON.parse(r[39]);
+        if (r[parentJsonCol]) parentData = JSON.parse(r[parentJsonCol]);
       } catch (e) {}
 
       var physicalData = {};
       try {
-        if (r[40]) physicalData = JSON.parse(r[40]);
-        else if (r[36] && String(r[36]).trim().startsWith("{")) physicalData = JSON.parse(r[36]);
+        if (r[physJsonCol]) physicalData = JSON.parse(r[physJsonCol]);
+        else if (r[36 + offset] && String(r[36 + offset]).trim().startsWith("{")) physicalData = JSON.parse(r[36 + offset]);
       } catch (e) {}
 
       students.push({
@@ -508,29 +553,30 @@ function loadAllDataFromSheets(ss) {
         jarakKeSekolah: String(r[20] || "").trim(),
         transportasi: String(r[21] || "").trim(),
         sekolahAsal: String(r[22] || "").trim(),
-        diterimaDiKelas: String(r[23] || "1A").trim(),
+        diterimaDiKelas: ditKelas,
         tanggalDiterima: String(r[24] || "").trim(),
-        statusSiswa: String(r[25] || "Aktif").trim(),
-        tahunLulus: String(r[26] || "").trim(),
-        noIjazah: String(r[27] || "").trim(),
-        fotoUrl: String(r[28] || "").trim(),
+        tingkatSaatIni: tingkatVal,
+        statusSiswa: String(r[25 + offset] || "Aktif").trim(),
+        tahunLulus: String(r[26 + offset] || "").trim(),
+        noIjazah: String(r[27 + offset] || "").trim(),
+        fotoUrl: String(r[28 + offset] || "").trim(),
         parentData: {
-          namaAyah: parentData.namaAyah || String(r[29] || "").trim(),
-          nikAyah: parentData.nikAyah || String(r[30] || "").trim(),
+          namaAyah: parentData.namaAyah || String(r[29 + offset] || "").trim(),
+          nikAyah: parentData.nikAyah || String(r[30 + offset] || "").trim(),
           tahunLahirAyah: parentData.tahunLahirAyah || '1980',
           pendidikanAyah: parentData.pendidikanAyah || 'SMA',
-          pekerjaanAyah: parentData.pekerjaanAyah || String(r[31] || "").trim(),
+          pekerjaanAyah: parentData.pekerjaanAyah || String(r[31 + offset] || "").trim(),
           penghasilanAyah: parentData.penghasilanAyah || 'Rp 3.000.000 - Rp 5.000.000',
-          namaIbu: parentData.namaIbu || String(r[32] || "").trim(),
-          nikIbu: parentData.nikIbu || String(r[33] || "").trim(),
+          namaIbu: parentData.namaIbu || String(r[32 + offset] || "").trim(),
+          nikIbu: parentData.nikIbu || String(r[33 + offset] || "").trim(),
           tahunLahirIbu: parentData.tahunLahirIbu || '1982',
           pendidikanIbu: parentData.pendidikanIbu || 'SMA',
-          pekerjaanIbu: parentData.pekerjaanIbu || String(r[34] || "").trim(),
+          pekerjaanIbu: parentData.pekerjaanIbu || String(r[34 + offset] || "").trim(),
           penghasilanIbu: parentData.penghasilanIbu || 'Tidak Berpenghasilan',
-          noHpOrangTua: parentData.noHpOrangTua || String(r[35] || "").trim(),
-          namaWali: parentData.namaWali || String(r[36] || "").trim(),
-          pekerjaanWali: parentData.pekerjaanWali || String(r[37] || "").trim(),
-          alamatOrangTua: parentData.alamatOrangTua || String(r[38] || r[14] || "").trim()
+          noHpOrangTua: parentData.noHpOrangTua || String(r[35 + offset] || "").trim(),
+          namaWali: parentData.namaWali || String(r[36 + offset] || "").trim(),
+          pekerjaanWali: parentData.pekerjaanWali || String(r[37 + offset] || "").trim(),
+          alamatOrangTua: parentData.alamatOrangTua || String(r[38 + offset] || r[14] || "").trim()
         },
         physicalData: physicalData
       });
@@ -726,6 +772,59 @@ export const syncAllDataToAppsScript = async (
   }
 };
 
+const formatDateStr = (val: any) => {
+  if (!val) return '';
+  const strVal = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) return strVal;
+  if (strVal.includes('GMT') || strVal.includes('00:00:00')) {
+    const d = new Date(strVal);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  }
+  return strVal;
+};
+
+const formatRtRwStr = (val: any) => {
+  if (!val) return '';
+  const strVal = String(val).trim();
+  if (strVal.includes('GMT') || strVal.includes('00:00:00')) {
+    const d = new Date(strVal);
+    if (!isNaN(d.getTime())) {
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${month}/${day}`;
+    }
+  }
+  return strVal;
+};
+
+export const sanitizeStudentsList = (rawStudents: any[]): StudentDetail[] => {
+  if (!Array.isArray(rawStudents)) return [];
+  const seenIds = new Set<string>();
+  return rawStudents.map((s, idx) => {
+    let id = s.id ? String(s.id).trim() : `std-${Date.now()}-${idx}`;
+    if (seenIds.has(id)) {
+      id = `${id}-dup${idx + 1}`;
+    }
+    seenIds.add(id);
+    const diterimaDiKelas = s.diterimaDiKelas || '1A';
+    const tingkatSaatIni = s.tingkatSaatIni || (String(diterimaDiKelas).startsWith('Tingkat') ? String(diterimaDiKelas) : `Tingkat ${diterimaDiKelas}`);
+    return {
+      ...s,
+      id,
+      diterimaDiKelas,
+      tingkatSaatIni,
+      tanggalLahir: formatDateStr(s.tanggalLahir),
+      tanggalDiterima: formatDateStr(s.tanggalDiterima),
+      rtRw: formatRtRwStr(s.rtRw)
+    };
+  });
+};
+
 /**
  * Loads all data from Google Spreadsheet via Google Apps Script Web App API
  */
@@ -766,7 +865,7 @@ export const loadDataFromAppsScript = async (
         success: true,
         schoolData: d.schoolData && Object.keys(d.schoolData).length > 0 ? d.schoolData : undefined,
         academicYear: d.academicYear && Object.keys(d.academicYear).length > 0 ? d.academicYear : undefined,
-        students: Array.isArray(d.students) && d.students.length > 0 ? d.students : undefined,
+        students: Array.isArray(d.students) && d.students.length > 0 ? sanitizeStudentsList(d.students) : undefined,
         semesterRecords: Array.isArray(d.semesterRecords) ? d.semesterRecords : [],
         subjects: Array.isArray(d.subjects) && d.subjects.length > 0 ? d.subjects : undefined,
       };
