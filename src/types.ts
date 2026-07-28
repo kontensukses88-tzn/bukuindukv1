@@ -94,6 +94,7 @@ export interface StudentDetail {
   // Riwayat
   sekolahAsal: string;
   diterimaDiKelas: string | number;
+  taDiterima?: string; // e.g. "2021/2022"
   tanggalDiterima: string;
   tingkatSaatIni?: string; // Current class/level e.g. "Tingkat 1" or "1"
   

@@ -249,7 +249,7 @@ export const syncAllDataToGoogleSheets = async (
         'Anak Ke', 'Jumlah Saudara Kandung', 'Bahasa Sehari-hari', 'Alamat Siswa',
         'RT RW', 'Desa/Dusun', 'Kecamatan', 'Kabupaten', 'Tinggal Dengan',
         'Jarak ke Sekolah', 'Transportasi', 'Sekolah Asal', 'Diterima di Kelas',
-        'Tanggal Diterima', 'Status Siswa', 'Tahun Lulus', 'No Ijazah', 'Foto URL',
+        'T.A. Diterima', 'Tanggal Diterima', 'Tingkat Saat Ini', 'Status Siswa', 'Tahun Lulus', 'No Ijazah', 'Foto URL',
         'Ayah', 'NIK Ayah', 'Pekerjaan Ayah', 'Ibu', 'NIK Ibu', 'Pekerjaan Ibu',
         'No HP Orang Tua', 'Wali', 'Pekerjaan Wali', 'Alamat Orang Tua',
         'Parent Data (JSON)', 'Physical Data (JSON)'
@@ -279,7 +279,9 @@ export const syncAllDataToGoogleSheets = async (
         std.transportasi || '',
         std.sekolahAsal || '',
         String(std.diterimaDiKelas || '1A'),
+        std.taDiterima || std.tahunAjaran || '',
         std.tanggalDiterima || '',
+        String(std.tingkatSaatIni || std.diterimaDiKelas || ''),
         std.statusSiswa || 'Aktif',
         std.tahunLulus || '',
         std.noIjazah || '',
@@ -479,7 +481,7 @@ export const loadDataFromGoogleSheets = async (
       'Data_Sekolah!A2:O5',
       'Tahun_Ajaran!A2:F5',
       'Mata_Pelajaran!A2:D500',
-      'Data_Siswa!A2:AO5000',
+      'Data_Siswa!A1:AO5000',
       'Catatan_Semester!A2:J5000',
     ];
 
@@ -552,13 +554,48 @@ export const loadDataFromGoogleSheets = async (
       }));
 
     // Parse Data_Siswa
-    const stdRows = valueRanges[3]?.values || [];
-    const students: StudentDetail[] = stdRows
+    const stdAllRows = valueRanges[3]?.values || [];
+    const stdHeaderRow = stdAllRows[0] || [];
+    const stdDataRows = stdAllRows.length > 1 && String(stdHeaderRow[0] || '').trim().toUpperCase() === 'ID' ? stdAllRows.slice(1) : stdAllRows;
+
+    const colMap: Record<string, number> = {};
+    for (let hc = 0; hc < stdHeaderRow.length; hc++) {
+      const hName = String(stdHeaderRow[hc]).trim().toLowerCase();
+      if (hName) colMap[hName] = hc;
+    }
+
+    const tkIndex = colMap['tingkat saat ini'] !== undefined ? colMap['tingkat saat ini'] : -1;
+    const stIndex = colMap['status siswa'] !== undefined ? colMap['status siswa'] : -1;
+
+    const students: StudentDetail[] = stdDataRows
       .filter((r: any) => r && (String(r[3] || '').trim() || String(r[1] || '').trim() || String(r[0] || '').trim()))
-      .map((r: any) => {
+      .map((r: any, idx: number) => {
+        const ditKelas = String(r[colMap['diterima di kelas'] !== undefined ? colMap['diterima di kelas'] : 23] || '1A').trim();
+        let tingkatVal = tkIndex !== -1 ? String(r[tkIndex] || '').trim() : (r.length >= 42 ? String(r[25] || '').trim() : '');
+        let statusVal = stIndex !== -1 ? String(r[stIndex] || '').trim() : String(r[tkIndex !== -1 || r.length >= 42 ? 26 : 25] || 'Aktif').trim();
+
+        const VALID_STATUSES = ['aktif', 'lulus', 'pindah', 'keluar', 'do', 'non-aktif', 'alumni'];
+        const isInvalidStatus = !VALID_STATUSES.includes(statusVal.toLowerCase());
+        if (isInvalidStatus || /tingkat/i.test(statusVal)) {
+          if (!tingkatVal || tingkatVal.toLowerCase() === 'aktif' || isInvalidStatus) {
+            if (/tingkat/i.test(statusVal) || /\d/.test(statusVal)) {
+              tingkatVal = statusVal;
+            }
+          }
+          statusVal = 'Aktif';
+        }
+
+        if (!tingkatVal || tingkatVal.toLowerCase() === 'aktif') {
+          tingkatVal = ditKelas.startsWith('Tingkat') ? ditKelas : `Tingkat ${ditKelas}`;
+        }
+
+        const offset = (tkIndex !== -1 || r.length >= 42) ? 1 : 0;
+        const parentJsonCol = colMap['parent data (json)'] !== undefined ? colMap['parent data (json)'] : (39 + offset);
+        const physJsonCol = colMap['physical data (json)'] !== undefined ? colMap['physical data (json)'] : (40 + offset);
+
         let parentData: any = {};
         try {
-          if (r[39]) parentData = JSON.parse(r[39]);
+          if (r[parentJsonCol]) parentData = JSON.parse(r[parentJsonCol]);
         } catch (e) {}
 
         let physicalData: any = {
@@ -570,60 +607,63 @@ export const loadDataFromGoogleSheets = async (
           gigi: 'Baik',
         };
         try {
-          if (r[40]) physicalData = JSON.parse(r[40]);
-          else if (r[36] && String(r[36]).trim().startsWith('{')) physicalData = JSON.parse(r[36]);
+          if (r[physJsonCol]) physicalData = JSON.parse(r[physJsonCol]);
+          else if (r[36 + offset] && String(r[36 + offset]).trim().startsWith('{')) physicalData = JSON.parse(r[36 + offset]);
         } catch (e) {}
 
-        const nis = String(r[1] || '').trim();
+        const nis = String(r[colMap['nis'] !== undefined ? colMap['nis'] : 1] || '').trim();
         return {
-          id: String(r[0] || '').trim() || (nis ? `STD-${nis}` : `STD-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`),
+          id: String(r[0] || '').trim() || (nis ? `STD-${nis}` : `STD-${Date.now()}-${idx}`),
           nis: nis,
-          nisn: String(r[2] || '').trim(),
-          namaLengkap: String(r[3] || '').trim(),
-          namaPanggilan: String(r[4] || '').trim(),
-          jenisKelamin: String(r[5] || '').toUpperCase().startsWith('P') ? 'P' : 'L',
-          tempatLahir: String(r[6] || '').trim(),
-          tanggalLahir: String(r[7] || '').trim(),
-          agama: String(r[8] || 'Islam').trim(),
-          kewarganegaraan: String(r[9] || 'Indonesia').trim(),
-          statusAnak: String(r[10] || 'Kandung').trim(),
-          anakKe: Number(r[11]) || 1,
-          jumlahSaudaraKandung: Number(r[12]) || 0,
+          nisn: String(r[colMap['nisn'] !== undefined ? colMap['nisn'] : 2] || '').trim(),
+          namaLengkap: String(r[colMap['nama lengkap'] !== undefined ? colMap['nama lengkap'] : 3] || '').trim(),
+          namaPanggilan: String(r[colMap['nama panggilan'] !== undefined ? colMap['nama panggilan'] : 4] || '').trim(),
+          jenisKelamin: String(r[colMap['jenis kelamin'] !== undefined ? colMap['jenis kelamin'] : 5] || '').toUpperCase().startsWith('P') ? 'P' : 'L',
+          tempatLahir: String(r[colMap['tempat lahir'] !== undefined ? colMap['tempat lahir'] : 6] || '').trim(),
+          tanggalLahir: String(r[colMap['tanggal lahir'] !== undefined ? colMap['tanggal lahir'] : 7] || '').trim(),
+          agama: String(r[colMap['agama'] !== undefined ? colMap['agama'] : 8] || 'Islam').trim(),
+          kewarganegaraan: String(r[colMap['kewarganegaraan'] !== undefined ? colMap['kewarganegaraan'] : 9] || 'Indonesia').trim(),
+          statusAnak: String(r[colMap['status anak'] !== undefined ? colMap['status anak'] : 10] || 'Kandung').trim(),
+          anakKe: Number(r[colMap['anak ke'] !== undefined ? colMap['anak ke'] : 11]) || 1,
+          jumlahSaudaraKandung: Number(r[colMap['jumlah saudara kandung'] !== undefined ? colMap['jumlah saudara kandung'] : 12]) || 0,
           jumlahSaudaraTiri: 0,
           jumlahSaudaraAngkat: 0,
-          bahasaSehariHari: String(r[13] || 'Indonesia').trim(),
-          alamatSiswa: String(r[14] || '').trim(),
-          rtRw: String(r[15] || '').trim(),
-          dusunDesa: String(r[16] || '').trim(),
-          kecamatan: String(r[17] || '').trim(),
-          kabupaten: String(r[18] || '').trim(),
-          tinggalDengan: String(r[19] || 'Orang Tua').trim(),
-          jarakKeSekolah: String(r[20] || '1 km').trim(),
-          transportasi: String(r[21] || 'Jalan Kaki').trim(),
-          sekolahAsal: String(r[22] || '').trim(),
-          diterimaDiKelas: String(r[23] || '1A').trim(),
-          tanggalDiterima: String(r[24] || '').trim(),
-          statusSiswa: String(r[25] || 'Aktif').trim(),
-          tahunLulus: String(r[26] || '').trim(),
-          noIjazah: String(r[27] || '').trim(),
-          fotoUrl: String(r[28] || '').trim(),
+          bahasaSehariHari: String(r[colMap['bahasa sehari-hari'] !== undefined ? colMap['bahasa sehari-hari'] : 13] || 'Indonesia').trim(),
+          alamatSiswa: String(r[colMap['alamat siswa'] !== undefined ? colMap['alamat siswa'] : 14] || '').trim(),
+          rtRw: String(r[colMap['rt rw'] !== undefined ? colMap['rt rw'] : 15] || '').trim(),
+          dusunDesa: String(r[colMap['desa/dusun'] !== undefined ? colMap['desa/dusun'] : 16] || '').trim(),
+          kecamatan: String(r[colMap['kecamatan'] !== undefined ? colMap['kecamatan'] : 17] || '').trim(),
+          kabupaten: String(r[colMap['kabupaten'] !== undefined ? colMap['kabupaten'] : 18] || '').trim(),
+          tinggalDengan: String(r[colMap['tinggal dengan'] !== undefined ? colMap['tinggal dengan'] : 19] || 'Orang Tua').trim(),
+          jarakKeSekolah: String(r[colMap['jarak ke sekolah'] !== undefined ? colMap['jarak ke sekolah'] : 20] || '1 km').trim(),
+          transportasi: String(r[colMap['transportasi'] !== undefined ? colMap['transportasi'] : 21] || 'Jalan Kaki').trim(),
+          sekolahAsal: String(r[colMap['sekolah asal'] !== undefined ? colMap['sekolah asal'] : 22] || '').trim(),
+          diterimaDiKelas: ditKelas,
+          taDiterima: String(r[colMap['t.a. diterima'] !== undefined ? colMap['t.a. diterima'] : (colMap['ta diterima'] !== undefined ? colMap['ta diterima'] : 24)] || '').trim(),
+          tahunAjaran: String(r[colMap['t.a. diterima'] !== undefined ? colMap['t.a. diterima'] : (colMap['ta diterima'] !== undefined ? colMap['ta diterima'] : 24)] || '').trim(),
+          tanggalDiterima: String(r[colMap['tanggal diterima'] !== undefined ? colMap['tanggal diterima'] : 25] || '').trim(),
+          tingkatSaatIni: tingkatVal,
+          statusSiswa: statusVal as any,
+          tahunLulus: String(r[colMap['tahun lulus'] !== undefined ? colMap['tahun lulus'] : (26 + offset)] || '').trim(),
+          noIjazah: String(r[colMap['no ijazah'] !== undefined ? colMap['no ijazah'] : (27 + offset)] || '').trim(),
+          fotoUrl: String(r[colMap['foto url'] !== undefined ? colMap['foto url'] : (28 + offset)] || '').trim(),
           parentData: {
-            namaAyah: parentData.namaAyah || String(r[29] || '').trim(),
-            nikAyah: parentData.nikAyah || String(r[30] || '').trim(),
+            namaAyah: parentData.namaAyah || String(r[colMap['ayah'] !== undefined ? colMap['ayah'] : (29 + offset)] || '').trim(),
+            nikAyah: parentData.nikAyah || String(r[colMap['nik ayah'] !== undefined ? colMap['nik ayah'] : (30 + offset)] || '').trim(),
             tahunLahirAyah: parentData.tahunLahirAyah || '1980',
             pendidikanAyah: parentData.pendidikanAyah || 'SMA',
-            pekerjaanAyah: parentData.pekerjaanAyah || String(r[31] || '').trim(),
+            pekerjaanAyah: parentData.pekerjaanAyah || String(r[colMap['pekerjaan ayah'] !== undefined ? colMap['pekerjaan ayah'] : (31 + offset)] || '').trim(),
             penghasilanAyah: parentData.penghasilanAyah || 'Rp 3.000.000 - Rp 5.000.000',
-            namaIbu: parentData.namaIbu || String(r[32] || '').trim(),
-            nikIbu: parentData.nikIbu || String(r[33] || '').trim(),
+            namaIbu: parentData.namaIbu || String(r[colMap['ibu'] !== undefined ? colMap['ibu'] : (32 + offset)] || '').trim(),
+            nikIbu: parentData.nikIbu || String(r[colMap['nik ibu'] !== undefined ? colMap['nik ibu'] : (33 + offset)] || '').trim(),
             tahunLahirIbu: parentData.tahunLahirIbu || '1982',
             pendidikanIbu: parentData.pendidikanIbu || 'SMA',
-            pekerjaanIbu: parentData.pekerjaanIbu || String(r[34] || '').trim(),
+            pekerjaanIbu: parentData.pekerjaanIbu || String(r[colMap['pekerjaan ibu'] !== undefined ? colMap['pekerjaan ibu'] : (34 + offset)] || '').trim(),
             penghasilanIbu: parentData.penghasilanIbu || 'Tidak Berpenghasilan',
-            noHpOrangTua: parentData.noHpOrangTua || String(r[35] || '').trim(),
-            namaWali: parentData.namaWali || String(r[36] || '').trim(),
-            pekerjaanWali: parentData.pekerjaanWali || String(r[37] || '').trim(),
-            alamatOrangTua: parentData.alamatOrangTua || String(r[38] || r[14] || '').trim(),
+            noHpOrangTua: parentData.noHpOrangTua || String(r[colMap['no hp orang tua'] !== undefined ? colMap['no hp orang tua'] : (35 + offset)] || '').trim(),
+            namaWali: parentData.namaWali || String(r[colMap['wali'] !== undefined ? colMap['wali'] : (36 + offset)] || '').trim(),
+            pekerjaanWali: parentData.pekerjaanWali || String(r[colMap['pekerjaan wali'] !== undefined ? colMap['pekerjaan wali'] : (37 + offset)] || '').trim(),
+            alamatOrangTua: parentData.alamatOrangTua || String(r[colMap['alamat orang tua'] !== undefined ? colMap['alamat orang tua'] : (38 + offset)] || '').trim(),
           },
           physicalData,
         };

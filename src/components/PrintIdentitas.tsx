@@ -95,6 +95,16 @@ export const PrintIdentitas: React.FC = () => {
               <span className="col-span-4">Sekolah Asal</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6">{currentStudent.sekolahAsal}</span>
+
+              <span className="col-span-1 text-slate-500 font-bold">10.</span>
+              <span className="col-span-4">Diterima di Kelas / T.A. Diterima</span>
+              <span className="col-span-1 font-bold">:</span>
+              <span className="col-span-6">Kelas {currentStudent.diterimaDiKelas} / T.A. {currentStudent.taDiterima || currentStudent.tahunAjaran || '-'}</span>
+
+              <span className="col-span-1 text-slate-500 font-bold">11.</span>
+              <span className="col-span-4">Tanggal Diterima Sekolah</span>
+              <span className="col-span-1 font-bold">:</span>
+              <span className="col-span-6">{formatIndonesianDate(currentStudent.tanggalDiterima)}</span>
             </div>
           </div>
 
@@ -104,22 +114,22 @@ export const PrintIdentitas: React.FC = () => {
               B. KETERANGAN ORANG TUA / WALI
             </h3>
             <div className="grid grid-cols-12 gap-y-1.5 pl-2">
-              <span className="col-span-1 text-slate-500 font-bold">10.</span>
+              <span className="col-span-1 text-slate-500 font-bold">12.</span>
               <span className="col-span-4">Nama Ayah Kandung</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6 font-bold">{currentStudent.parentData.namaAyah}</span>
 
-              <span className="col-span-1 text-slate-500 font-bold">11.</span>
+              <span className="col-span-1 text-slate-500 font-bold">13.</span>
               <span className="col-span-4">Nama Ibu Kandung</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6 font-bold">{currentStudent.parentData.namaIbu}</span>
 
-              <span className="col-span-1 text-slate-500 font-bold">12.</span>
+              <span className="col-span-1 text-slate-500 font-bold">14.</span>
               <span className="col-span-4">Pekerjaan Ayah / Ibu</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6">{currentStudent.parentData.pekerjaanAyah} / {currentStudent.parentData.pekerjaanIbu}</span>
 
-              <span className="col-span-1 text-slate-500 font-bold">13.</span>
+              <span className="col-span-1 text-slate-500 font-bold">15.</span>
               <span className="col-span-4">No. HP Orang Tua</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6">{currentStudent.parentData.noHpOrangTua}</span>
@@ -132,12 +142,12 @@ export const PrintIdentitas: React.FC = () => {
               C. KETERANGAN CIRI FISIK & KESEHATAN
             </h3>
             <div className="grid grid-cols-12 gap-y-1.5 pl-2">
-              <span className="col-span-1 text-slate-500 font-bold">14.</span>
+              <span className="col-span-1 text-slate-500 font-bold">16.</span>
               <span className="col-span-4">Tinggi / Berat Badan</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6">{currentStudent.physicalData.tinggiBadan} cm / {currentStudent.physicalData.beratBadan} kg</span>
 
-              <span className="col-span-1 text-slate-500 font-bold">15.</span>
+              <span className="col-span-1 text-slate-500 font-bold">17.</span>
               <span className="col-span-4">Golongan Darah</span>
               <span className="col-span-1 font-bold">:</span>
               <span className="col-span-6">{currentStudent.physicalData.golonganDarah}</span>

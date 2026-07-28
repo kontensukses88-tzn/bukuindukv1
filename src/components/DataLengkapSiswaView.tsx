@@ -349,8 +349,8 @@ export const DataLengkapSiswaView: React.FC = () => {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">T.A. Diterima</label>
                   <select
-                    value={formData.tahunAjaran || ''}
-                    onChange={e => setFormData({ ...formData, tahunAjaran: e.target.value })}
+                    value={formData.taDiterima || formData.tahunAjaran || ''}
+                    onChange={e => setFormData({ ...formData, taDiterima: e.target.value, tahunAjaran: e.target.value })}
                     className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-bold"
                   >
                     {availableAcademicYears.map(yr => (

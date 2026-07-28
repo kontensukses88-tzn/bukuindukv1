@@ -29,6 +29,7 @@ import {
 } from '../lib/googleSheets';
 import { getCachedAccessToken } from '../lib/googleAuth';
 import {
+  checkIsQuotaExceeded,
   deleteStudentFromFirestore,
   loadFromFirebaseFirestore,
   saveToFirebaseFirestore,
@@ -258,22 +259,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [academicYear.tahunAjaran, students]);
   const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzdTtGi3u8FmyJhl9HrWG4JpXCAmx3Vo7jdQKtWXwJKiRy6JBuDqb1ITDK-hC3Jctk3/exec';
 
-  const [webAppUrl, setWebAppUrl] = useState<string>(() => {
+  const [webAppUrl, setWebAppUrlState] = useState<string>(() => {
     const config = getSavedAppsScriptConfig();
-    return config?.webAppUrl || DEFAULT_WEB_APP_URL;
+    return (config?.webAppUrl || DEFAULT_WEB_APP_URL).trim();
   });
 
-  const [spreadsheetId, setSpreadsheetId] = useState<string>(() => {
+  const [spreadsheetId, setSpreadsheetIdState] = useState<string>(() => {
     const config = getSavedSpreadsheetConfig();
-    return config?.spreadsheetId || '';
+    return (config?.spreadsheetId || '').trim();
   });
 
-  const [accessToken, setAccessToken] = useState<string>(() => {
+  const [accessToken, setAccessTokenState] = useState<string>(() => {
     const config = getSavedSpreadsheetConfig();
     return config?.accessToken || '';
   });
 
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(false);
+  const [autoSyncEnabled, setAutoSyncEnabledState] = useState<boolean>(() => {
+    const appsConfig = getSavedAppsScriptConfig();
+    if (appsConfig && typeof appsConfig.autoSync === 'boolean') {
+      return appsConfig.autoSync;
+    }
+    const sheetConfig = getSavedSpreadsheetConfig();
+    if (sheetConfig && typeof sheetConfig.autoSync === 'boolean') {
+      return sheetConfig.autoSync;
+    }
+    return true; // Default to true so automatic sync works out of the box
+  });
+
+  const setWebAppUrl = (url: string) => {
+    const trimmed = url.trim();
+    setWebAppUrlState(trimmed);
+    saveAppsScriptConfig({ webAppUrl: trimmed });
+  };
+
+  const setSpreadsheetId = (id: string) => {
+    const trimmed = id.trim();
+    setSpreadsheetIdState(trimmed);
+    saveSpreadsheetConfig({ spreadsheetId: trimmed });
+  };
+
+  const setAccessToken = (token: string) => {
+    setAccessTokenState(token);
+    saveSpreadsheetConfig({ accessToken: token });
+  };
+
+  const setAutoSyncEnabled = (val: boolean) => {
+    setAutoSyncEnabledState(val);
+    saveAppsScriptConfig({ autoSync: val });
+    saveSpreadsheetConfig({ autoSync: val });
+  };
   const [isAutoSyncing, setIsAutoSyncing] = useState<boolean>(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -291,6 +325,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubscribe: (() => void) | undefined;
 
     async function initFirebase() {
+      if (checkIsQuotaExceeded()) {
+        setFirebaseConnected(false);
+        setFirebaseSyncing(false);
+        isInitialFirebaseLoadRef.current = false;
+        return;
+      }
+
       setFirebaseSyncing(true);
       try {
         const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
@@ -319,23 +360,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             saveAppsScriptConfig({ webAppUrl: targetUrl, lastSyncedAt: new Date().toISOString() });
 
-            await saveToFirebaseFirestore({
-              schoolData: appsScriptData.schoolData || schoolData,
-              academicYear: appsScriptData.academicYear || academicYear,
-              subjects: appsScriptData.subjects || subjects,
-              availableAcademicYears,
-              students: appsScriptData.students ? sanitizeStudentsList(appsScriptData.students) : students,
-              semesterRecords: appsScriptData.semesterRecords || semesterRecords
-            });
-
-            setFirebaseLastSynced(new Date());
+            if (!checkIsQuotaExceeded()) {
+              const res = await saveToFirebaseFirestore({
+                schoolData: appsScriptData.schoolData || schoolData,
+                academicYear: appsScriptData.academicYear || academicYear,
+                subjects: appsScriptData.subjects || subjects,
+                availableAcademicYears,
+                students: appsScriptData.students ? sanitizeStudentsList(appsScriptData.students) : students,
+                semesterRecords: appsScriptData.semesterRecords || semesterRecords
+              });
+              if (res.success) setFirebaseLastSynced(new Date());
+              else if (res.quotaExceeded) setFirebaseConnected(false);
+            }
             setTimeout(() => {
               isRemoteUpdateRef.current = false;
             }, 800);
           }
         }
 
-        if (!appsScriptSuccess) {
+        if (!appsScriptSuccess && !checkIsQuotaExceeded()) {
           const cloudData = await loadFromFirebaseFirestore();
           if (cloudData && (cloudData.students?.length || cloudData.schoolData)) {
             isRemoteUpdateRef.current = true;
@@ -349,9 +392,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setTimeout(() => {
               isRemoteUpdateRef.current = false;
             }, 800);
-          } else {
+          } else if (!checkIsQuotaExceeded()) {
             // If Firestore is empty, seed initial data to Firebase
-            await saveToFirebaseFirestore({
+            const res = await saveToFirebaseFirestore({
               schoolData,
               academicYear,
               subjects,
@@ -359,10 +402,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               students,
               semesterRecords
             });
-            setFirebaseLastSynced(new Date());
+            if (res.success) setFirebaseLastSynced(new Date());
+            else if (res.quotaExceeded) setFirebaseConnected(false);
           }
         }
-        setFirebaseConnected(true);
+        if (!checkIsQuotaExceeded()) {
+          setFirebaseConnected(true);
+        } else {
+          setFirebaseConnected(false);
+        }
       } catch (err) {
         console.error('Firebase/AppsScript initialization error:', err);
       } finally {
@@ -371,20 +419,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Realtime listener for multi-device sync
-      unsubscribe = subscribeToFirebaseChanges((updated) => {
-        if (isRemoteUpdateRef.current) return;
-        isRemoteUpdateRef.current = true;
-        if (updated.schoolData) setSchoolData(updated.schoolData);
-        if (updated.academicYear) setAcademicYear(updated.academicYear);
-        if (updated.subjects && updated.subjects.length > 0) setSubjects(updated.subjects);
-        if (updated.availableAcademicYears && updated.availableAcademicYears.length > 0) setAvailableAcademicYears(updated.availableAcademicYears);
-        if (updated.students && updated.students.length > 0) setStudents(sanitizeStudentsList(updated.students));
-        if (updated.semesterRecords) setSemesterRecords(updated.semesterRecords);
-        setFirebaseLastSynced(new Date());
-        setTimeout(() => {
-          isRemoteUpdateRef.current = false;
-        }, 800);
-      });
+      if (!checkIsQuotaExceeded()) {
+        unsubscribe = subscribeToFirebaseChanges((updated) => {
+          if (isRemoteUpdateRef.current) return;
+          isRemoteUpdateRef.current = true;
+          if (updated.schoolData) setSchoolData(updated.schoolData);
+          if (updated.academicYear) setAcademicYear(updated.academicYear);
+          if (updated.subjects && updated.subjects.length > 0) setSubjects(updated.subjects);
+          if (updated.availableAcademicYears && updated.availableAcademicYears.length > 0) setAvailableAcademicYears(updated.availableAcademicYears);
+          if (updated.students && updated.students.length > 0) setStudents(sanitizeStudentsList(updated.students));
+          if (updated.semesterRecords) setSemesterRecords(updated.semesterRecords);
+          setFirebaseLastSynced(new Date());
+          setTimeout(() => {
+            isRemoteUpdateRef.current = false;
+          }, 800);
+        });
+      }
     }
 
     initFirebase();
@@ -398,6 +448,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (isInitialFirebaseLoadRef.current) return;
     if (isRemoteUpdateRef.current) return;
+    if (checkIsQuotaExceeded()) {
+      setFirebaseConnected(false);
+      return;
+    }
 
     const timer = setTimeout(async () => {
       setFirebaseSyncing(true);
@@ -412,8 +466,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setFirebaseSyncing(false);
       if (res.success) {
         setFirebaseLastSynced(new Date());
+        setFirebaseConnected(true);
+      } else if (res.quotaExceeded) {
+        setFirebaseConnected(false);
       }
-    }, 1500);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [schoolData, academicYear, subjects, availableAcademicYears, students, semesterRecords]);
@@ -422,7 +479,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     // ONLY sync automatically if autoSyncEnabled is explicitly true
     if (!autoSyncEnabled) return;
-    if (!webAppUrl && (!spreadsheetId || !accessToken)) return;
+    const activeUrl = (webAppUrl || DEFAULT_WEB_APP_URL).trim();
+    if (!activeUrl && (!spreadsheetId || !accessToken)) return;
     if (isRemoteUpdateRef.current) return;
 
     const timer = setTimeout(async () => {
@@ -430,9 +488,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSyncError(null);
 
       let report;
-      if (webAppUrl) {
+      if (activeUrl) {
         report = await syncAllDataToAppsScript(
-          webAppUrl,
+          activeUrl,
           schoolData,
           academicYear,
           students,

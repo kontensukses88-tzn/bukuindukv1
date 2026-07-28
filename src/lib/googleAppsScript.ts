@@ -154,7 +154,7 @@ function setupDatabase() {
     "Anak Ke", "Jumlah Saudara Kandung", "Bahasa Sehari-hari", "Alamat Siswa",
     "RT RW", "Desa/Dusun", "Kecamatan", "Kabupaten", "Tinggal Dengan",
     "Jarak ke Sekolah", "Transportasi", "Sekolah Asal", "Diterima di Kelas",
-    "Tanggal Diterima", "Tingkat Saat Ini", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
+    "T.A. Diterima", "Tanggal Diterima", "Tingkat Saat Ini", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
     "Ayah", "NIK Ayah", "Pekerjaan Ayah", "Ibu", "NIK Ibu", "Pekerjaan Ibu",
     "No HP Orang Tua", "Wali", "Pekerjaan Wali", "Alamat Orang Tua",
     "Parent Data (JSON)", "Physical Data (JSON)"
@@ -162,18 +162,20 @@ function setupDatabase() {
   if (sheetSiswa.getLastRow() === 0) {
     sheetSiswa.appendRow(siswaHeaders);
   } else {
-    // Check if "Tingkat Saat Ini" is missing from header row
     var curHeaders = sheetSiswa.getRange(1, 1, 1, Math.max(1, sheetSiswa.getLastColumn())).getValues()[0];
+    var hasTaDiterima = false;
     var hasTingkat = false;
     for (var ch = 0; ch < curHeaders.length; ch++) {
-      if (String(curHeaders[ch]).trim().toLowerCase() === "tingkat saat ini") {
+      var hLower = String(curHeaders[ch]).trim().toLowerCase();
+      if (hLower === "t.a. diterima" || hLower === "ta diterima" || hLower === "tahun ajaran diterima") {
+        hasTaDiterima = true;
+      }
+      if (hLower === "tingkat saat ini") {
         hasTingkat = true;
-        break;
       }
     }
-    if (!hasTingkat && curHeaders.length >= 25) {
-      sheetSiswa.insertColumnAfter(25);
-      sheetSiswa.getRange(1, 26).setValue("Tingkat Saat Ini");
+    if (!hasTaDiterima || !hasTingkat || curHeaders.length < siswaHeaders.length) {
+      sheetSiswa.getRange(1, 1, 1, siswaHeaders.length).setValues([siswaHeaders]);
     }
   }
   formatHeaderRow(sheetSiswa, "#047857");
@@ -267,17 +269,23 @@ function doGet(e) {
 function doPost(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var contents = e.postData.contents;
-    var payload = JSON.parse(contents);
+    var contents = (e && e.postData && e.postData.contents) ? e.postData.contents : "{}";
+    var payload = {};
+    try {
+      payload = JSON.parse(contents);
+    } catch (parseErr) {
+      payload = {};
+    }
 
-    var action = payload.action || "saveAllData";
+    var action = payload.action || (e && e.parameter ? e.parameter.action : "saveAllData");
     var data = payload.data || {};
 
     if (action === "setupDatabase" || action === "initDatabase") {
-      setupDatabase();
+      var setupRes = setupDatabase();
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
-        message: "Inisialisasi database worksheet (initDatabase) berhasil dibuat!"
+        message: "Inisialisasi database worksheet (initDatabase) berhasil dibuat!",
+        details: setupRes
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -367,7 +375,7 @@ function saveAllDataToSheets(ss, data) {
       "Anak Ke", "Jumlah Saudara Kandung", "Bahasa Sehari-hari", "Alamat Siswa",
       "RT RW", "Desa/Dusun", "Kecamatan", "Kabupaten", "Tinggal Dengan",
       "Jarak ke Sekolah", "Transportasi", "Sekolah Asal", "Diterima di Kelas",
-      "Tanggal Diterima", "Tingkat Saat Ini", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
+      "T.A. Diterima", "Tanggal Diterima", "Tingkat Saat Ini", "Status Siswa", "Tahun Lulus", "No Ijazah", "Foto URL",
       "Ayah", "NIK Ayah", "Pekerjaan Ayah", "Ibu", "NIK Ibu", "Pekerjaan Ibu",
       "No HP Orang Tua", "Wali", "Pekerjaan Wali", "Alamat Orang Tua",
       "Parent Data (JSON)", "Physical Data (JSON)"
@@ -376,6 +384,7 @@ function saveAllDataToSheets(ss, data) {
       var std = data.students[j];
       var p = std.parentData || {};
       var tk = std.tingkatSaatIni || std.diterimaDiKelas || "";
+      var taDiterimaVal = std.taDiterima || std.tahunAjaran || "";
       sheetSiswa.appendRow([
         std.id || "", std.nis || "", std.nisn || "", std.namaLengkap || "",
         std.namaPanggilan || "", std.jenisKelamin || "L", std.tempatLahir || "",
@@ -384,8 +393,8 @@ function saveAllDataToSheets(ss, data) {
         std.bahasaSehariHari || "Indonesia", std.alamatSiswa || "", std.rtRw || "",
         std.dusunDesa || "", std.kecamatan || "", std.kabupaten || "",
         std.tinggalDengan || "Orang Tua", std.jarakKeSekolah || "", std.transportasi || "",
-        std.sekolahAsal || "", std.diterimaDiKelas || "1A", std.tanggalDiterima || "",
-        tk,
+        std.sekolahAsal || "", std.diterimaDiKelas || "1A",
+        taDiterimaVal, std.tanggalDiterima || "", tk,
         std.statusSiswa || "Aktif", std.tahunLulus || "", std.noIjazah || "",
         std.fotoUrl || "", p.namaAyah || "", p.nikAyah || "", p.pekerjaanAyah || "",
         p.namaIbu || "", p.nikIbu || "", p.pekerjaanIbu || "", p.noHpOrangTua || "",
@@ -575,7 +584,9 @@ function loadAllDataFromSheets(ss) {
         transportasi: String(r[colMap["transportasi"] !== undefined ? colMap["transportasi"] : 21] || "").trim(),
         sekolahAsal: String(r[colMap["sekolah asal"] !== undefined ? colMap["sekolah asal"] : 22] || "").trim(),
         diterimaDiKelas: ditKelas,
-        tanggalDiterima: String(r[colMap["tanggal diterima"] !== undefined ? colMap["tanggal diterima"] : 24] || "").trim(),
+        taDiterima: String(r[colMap["t.a. diterima"] !== undefined ? colMap["t.a. diterima"] : (colMap["ta diterima"] !== undefined ? colMap["ta diterima"] : 24)] || "").trim(),
+        tahunAjaran: String(r[colMap["t.a. diterima"] !== undefined ? colMap["t.a. diterima"] : (colMap["ta diterima"] !== undefined ? colMap["ta diterima"] : 24)] || "").trim(),
+        tanggalDiterima: String(r[colMap["tanggal diterima"] !== undefined ? colMap["tanggal diterima"] : 25] || "").trim(),
         tingkatSaatIni: tingkatVal,
         statusSiswa: statusVal,
         tahunLulus: String(r[colMap["tahun lulus"] !== undefined ? colMap["tahun lulus"] : (26 + offset)] || "").trim(),
@@ -737,7 +748,8 @@ export const syncAllDataToAppsScript = async (
     errors: [],
   };
 
-  if (!webAppUrl || !webAppUrl.startsWith('http')) {
+  const targetUrl = webAppUrl ? webAppUrl.trim() : '';
+  if (!targetUrl || !targetUrl.startsWith('http')) {
     report.errors.push('URL Google Apps Script Web App belum dikonfigurasi.');
     return report;
   }
@@ -756,7 +768,7 @@ export const syncAllDataToAppsScript = async (
 
     // Note: Google Apps Script Web App POST redirects 302 to googleusercontent.
     // fetch with redirect: 'follow' and text/plain content type bypasses CORS preflight
-    const response = await fetch(webAppUrl, {
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8',
@@ -880,12 +892,13 @@ export const loadDataFromAppsScript = async (
   subjects?: SubjectItem[];
   error?: string;
 }> => {
-  if (!webAppUrl || !webAppUrl.startsWith('http')) {
+  const targetUrl = webAppUrl ? webAppUrl.trim() : '';
+  if (!targetUrl || !targetUrl.startsWith('http')) {
     return { success: false, error: 'URL Google Apps Script Web App belum diisi.' };
   }
 
   try {
-    const fetchUrl = `${webAppUrl}${webAppUrl.includes('?') ? '&' : '?'}action=getAllData`;
+    const fetchUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getAllData`;
     const response = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
 
     if (!response.ok) {

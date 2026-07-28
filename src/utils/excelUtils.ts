@@ -25,6 +25,7 @@ export const EXCEL_COLUMNS = [
   'Transportasi',
   'Sekolah Asal (TK/PAUD)',
   'Diterima di Kelas',
+  'T.A. Diterima',
   'Tanggal Diterima',
   'Status Siswa (Aktif/Lulus/Pindah/Keluar)',
   'Nama Ayah',
@@ -71,6 +72,7 @@ export const downloadExcelTemplate = () => {
       'Transportasi': 'Jalan Kaki',
       'Sekolah Asal (TK/PAUD)': 'TK Pembina Bandung',
       'Diterima di Kelas': '1A',
+      'T.A. Diterima': '2021/2022',
       'Tanggal Diterima': '12 Juli 2021',
       'Status Siswa (Aktif/Lulus/Pindah/Keluar)': 'Aktif',
       'Nama Ayah': 'Rahmat Santoso',
@@ -380,6 +382,7 @@ export const parseExcelFile = (file: File): Promise<Omit<StudentDetail, 'id'>[]>
           const jarakKeSekolah = getFlexibleValue(row, ['Jarak ke Sekolah', 'Jarak'], '1 km');
           const transportasi = getFlexibleValue(row, ['Transportasi', 'Angkutan'], 'Jalan Kaki');
           const sekolahAsal = getFlexibleValue(row, ['Sekolah Asal (TK/PAUD)', 'Sekolah Asal', 'Asal Sekolah'], 'TK/PAUD');
+          const taDiterima = getFlexibleValue(row, ['T.A. Diterima', 'TA Diterima', 'Tahun Ajaran Diterima', 'T.A.', 'TA', 'Tahun Ajaran'], '2021/2022');
           const tanggalDiterima = getFlexibleValue(row, ['Tanggal Diterima', 'Tgl Diterima'], '12 Juli 2021');
 
           // Parent Data
@@ -430,6 +433,8 @@ export const parseExcelFile = (file: File): Promise<Omit<StudentDetail, 'id'>[]>
             transportasi,
             sekolahAsal,
             diterimaDiKelas,
+            taDiterima,
+            tahunAjaran: taDiterima,
             tanggalDiterima,
             statusSiswa,
             parentData: {

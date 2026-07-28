@@ -95,6 +95,7 @@ export const DataSiswaView: React.FC = () => {
       diterimaDiKelas: newKelas,
       tanggalDiterima: newTanggalDiterima || '2024-07-15',
       tingkatSaatIni: newTingkatSaatIni || (String(newKelas).startsWith('Tingkat') ? String(newKelas) : `Tingkat ${newKelas}`),
+      taDiterima: newTahunAjaran || academicYear.tahunAjaran,
       tahunAjaran: newTahunAjaran || academicYear.tahunAjaran,
       statusSiswa: 'Aktif',
       fotoUrl: newJk === 'L' 
